@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,21 +21,27 @@ var (
 )
 
 func main() {
+	//dumpUrl("http://s.taobao.com/search?q=LoveLive&commend=all&ssid=s5-e&search_type=item&sourceId=tb.index&spm=1.7274553.1997520841.1&initiative_id=tbindexz_20150607&bcoffset=-4&s=44")
+	//pt("\n")
+	//dumpUrl("http://s.taobao.com/search?q=LoveLive&commend=all&ssid=s5-e&search_type=item&sourceId=tb.index&spm=1.7274553.1997520841.1&initiative_id=tbindexz_20150607&bcoffset=-4&s=88")
+	//pt("\n")
+	//dumpUrl("http://s.taobao.com/search?q=LoveLive&commend=all&ssid=s5-e&search_type=item&sourceId=tb.index&spm=1.7274553.1997520841.1&initiative_id=tbindexz_20150607&bcoffset=-4&s=132")
+
 	client := &http.Client{
 		Timeout: time.Second * 16,
 	}
 
-	rawUrl := "http://s.taobao.com/search?q=LoveLive"
-	content, err := hcutil.GetBytes(client, rawUrl)
-	ce(err, "get")
-
-	res, err := parseResult(content)
-	ce(err, "parse")
-	_ = res
+	for page := 0; page < 100; page++ {
+		items, err := KeywordAndPage(client, "LoveLive", page)
+		ce(err, sp("page %d", page))
+		for _, item := range items {
+			pt("%s\n", item.Raw_title)
+		}
+	}
 
 }
 
-type Entry struct {
+type Item struct {
 	I2iTags       map[string]interface{}
 	Nid           string
 	Category      string
@@ -68,8 +75,12 @@ type Entry struct {
 	ShopLink    string
 }
 
-func parseResult(bs []byte) ([]Entry, error) {
-	// get json string
+func KeywordAndPage(client *http.Client, keyword string, page int) ([]Item, error) {
+	rawUrl := sp("http://s.taobao.com/search?q=%s&s=%d", keyword, 44*page)
+	bs, err := hcutil.GetBytes(client, rawUrl)
+	if err != nil {
+		return nil, makeErr(err, sp("get %s", rawUrl))
+	}
 	content := string(bs)
 	var jStr string
 	for _, line := range strings.Split(content, "\n") {
@@ -90,14 +101,14 @@ func parseResult(bs []byte) ([]Entry, error) {
 			Data   json.RawMessage
 		}
 	}
-	err := json.Unmarshal([]byte(jStr), &data)
+	err = json.Unmarshal([]byte(jStr), &data)
 	if err != nil {
 		return nil, makeErr(err, "decode")
 	}
 
 	var itemData struct {
 		PostFeeText, Trace          string
-		Auctions, RecommendAuctions []Entry
+		Auctions, RecommendAuctions []Item
 		IsSameStyleView             bool
 		Sellers                     []interface{} //TODO
 		Query                       string
@@ -106,18 +117,29 @@ func parseResult(bs []byte) ([]Entry, error) {
 	if err != nil {
 		return nil, makeErr(err, "unmarshal")
 	}
-	for _, item := range itemData.Auctions {
-		pt("%v\n", item.Raw_title)
+	if page == 0 {
+		if len(itemData.Auctions) != 48 {
+			return nil, fmt.Errorf("wrong result count, got %d", len(itemData.Auctions))
+		}
+	} else {
+		if len(itemData.Auctions) != 44 {
+			return nil, fmt.Errorf("wrong result count, got %d", len(itemData.Auctions))
+		}
 	}
-	return nil, nil
+	return itemData.Auctions, nil
 }
 
 func dumpUrl(rawUrl string) {
 	u, err := url.Parse(rawUrl)
 	ce(err, "parse url")
 	query := u.Query()
-	for k, v := range query {
-		pt("%s -> %v\n", k, v)
+	var keys []string
+	for k := range query {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		pt("%s -> %v\n", k, query[k])
 	}
 }
 
