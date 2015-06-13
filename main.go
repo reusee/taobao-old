@@ -30,14 +30,47 @@ func main() {
 	client := &http.Client{
 		Timeout: time.Second * 16,
 	}
+	_ = client
 
-	for page := 0; page < 100; page++ {
-		items, err := KeywordAndPage(client, "LoveLive", page)
-		ce(err, sp("page %d", page))
-		for _, item := range items {
-			pt("%s\n", item.Raw_title)
+	//for page := 0; page < 100; page++ {
+	//	items, err := KeywordAndPage(client, "LoveLive", page)
+	//	ce(err, sp("page %d", page))
+	//	for _, item := range items {
+	//		pt("%s\n", item.Raw_title)
+	//	}
+	//}
+
+	var collectCategory func(cat string)
+	collectCategory = func(cat string) {
+		bs, err := hcutil.GetBytes(client, sp("http://s.taobao.com/list?cat=%s", cat))
+		ce(err, "get")
+		jstr, err := GetPageConfigJson(string(bs))
+		ce(err, "get page config")
+		var config PageConfig
+		err = json.Unmarshal(jstr, &config)
+		ce(err, "unmarshal")
+		var nav struct {
+			Common []struct {
+				Text string
+				Sub  []struct {
+					Text  string
+					Key   string
+					Value string
+				}
+			}
+		}
+		err = json.Unmarshal(config.Mods["nav"].Data, &nav)
+		ce(err, "unmarshal")
+		for _, e := range nav.Common {
+			if e.Text == "相关分类" {
+				for _, sub := range e.Sub {
+					pt("%s %s\n", sub.Text, sub.Value)
+					collectCategory(sub.Value)
+				}
+			}
 		}
 	}
+	collectCategory("")
 
 }
 
@@ -75,13 +108,7 @@ type Item struct {
 	ShopLink    string
 }
 
-func KeywordAndPage(client *http.Client, keyword string, page int) ([]Item, error) {
-	rawUrl := sp("http://s.taobao.com/search?q=%s&s=%d", keyword, 44*page)
-	bs, err := hcutil.GetBytes(client, rawUrl)
-	if err != nil {
-		return nil, makeErr(err, sp("get %s", rawUrl))
-	}
-	content := string(bs)
+func GetPageConfigJson(content string) ([]byte, error) {
 	var jStr string
 	for _, line := range strings.Split(content, "\n") {
 		line = strings.TrimLeft(line, " ")
@@ -92,16 +119,31 @@ func KeywordAndPage(client *http.Client, keyword string, page int) ([]Item, erro
 		}
 	}
 	if len(jStr) == 0 {
-		return nil, fmt.Errorf("no data")
+		return nil, fmt.Errorf("g_global_config not found")
 	}
-	var data struct {
-		Mods map[string]struct {
-			Status string
-			Export bool
-			Data   json.RawMessage
-		}
+	return []byte(jStr), nil
+}
+
+type PageConfig struct {
+	Mods map[string]struct {
+		Status string
+		Export bool
+		Data   json.RawMessage
 	}
-	err = json.Unmarshal([]byte(jStr), &data)
+}
+
+func KeywordAndPage(client *http.Client, keyword string, page int) ([]Item, error) {
+	rawUrl := sp("http://s.taobao.com/search?q=%s&s=%d", keyword, 44*page)
+	bs, err := hcutil.GetBytes(client, rawUrl)
+	if err != nil {
+		return nil, makeErr(err, sp("get %s", rawUrl))
+	}
+	jStr, err := GetPageConfigJson(string(bs))
+	if err != nil {
+		return nil, makeErr(err, "get g_page_config")
+	}
+	var config PageConfig
+	err = json.Unmarshal(jStr, &config)
 	if err != nil {
 		return nil, makeErr(err, "decode")
 	}
@@ -113,7 +155,7 @@ func KeywordAndPage(client *http.Client, keyword string, page int) ([]Item, erro
 		Sellers                     []interface{} //TODO
 		Query                       string
 	}
-	err = json.Unmarshal(data.Mods["itemlist"].Data, &itemData)
+	err = json.Unmarshal(config.Mods["itemlist"].Data, &itemData)
 	if err != nil {
 		return nil, makeErr(err, "unmarshal")
 	}
