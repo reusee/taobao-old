@@ -111,11 +111,8 @@ collect:
 		job := job
 		go func() {
 			defer func() {
-				wg.Done()
 				clients <- client
-				_, err = db.Exec(sp("UPDATE %s SET DONE = TRUE WHERE cat = $1 AND page = $2", jobsTableName),
-					job.Cat, job.Page)
-				ce(err, "update job table")
+				wg.Done()
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			bs, err := hcutil.GetBytes(client, url)
@@ -136,6 +133,9 @@ collect:
 			ce(err, "insert")
 			pt("collected cat %d page %d, %d items\n", job.Cat, job.Page, len(items))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
+				_, err = db.Exec(sp("UPDATE %s SET done = TRUE WHERE cat = $1 AND page = $2", jobsTableName),
+					job.Cat, job.Page)
+				ce(err, "update job table")
 				return
 			}
 			var pagerData struct {
@@ -153,6 +153,9 @@ collect:
 					job.Cat, i)
 				ce(err, "insert job")
 			}
+			_, err = db.Exec(sp("UPDATE %s SET done = TRUE WHERE cat = $1 AND page = $2", jobsTableName),
+				job.Cat, job.Page)
+			ce(err, "update job table")
 		}()
 	}
 	wg.Wait()
@@ -190,7 +193,7 @@ type Item struct {
 		SellerCredit    int
 		TotalRate       int
 	}
-	//Icon        interface{} // TODO
+	//Icon        interface{}
 	Comment_url string
 	ShopLink    string
 }
@@ -227,7 +230,7 @@ func GetItems(data []byte) ([]Item, error) {
 		PostFeeText, Trace          string
 		Auctions, RecommendAuctions []Item
 		IsSameStyleView             bool
-		Sellers                     []interface{} //TODO
+		Sellers                     []interface{}
 		Query                       string
 	}
 	err := json.Unmarshal(data, &itemData)
