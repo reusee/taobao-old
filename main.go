@@ -130,6 +130,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	newJobs := []Job{}
+	now := time.Now()
 	for _, job := range jobs {
 		client := <-clients
 		job := job
@@ -152,7 +153,7 @@ func main() {
 			err = gob.NewEncoder(buf).Encode(items)
 			ce(err, "encode gob")
 			_, err = db.Exec("INSERT INTO raw (time, cat, page, gob) VALUES ($1, $2, $3, $4)",
-				time.Now(), job.cat, job.page, buf.Bytes())
+				now, job.cat, job.page, buf.Bytes())
 			ce(err, "insert")
 			pt("collected %s, %d items\n", url, len(items))
 			if config.Mods["pager"].Status != "show" {
