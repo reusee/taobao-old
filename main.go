@@ -97,11 +97,12 @@ collect:
 		Cat  uint64
 		Page int
 	}{}
-	err = db.Select(&jobs, sp(`SELECT cat,page FROM %s WHERE page = 0 AND done = FALSE`, jobsTableName))
+	err = db.Select(&jobs, sp(`SELECT cat,page FROM %s WHERE done = FALSE`, jobsTableName))
 	ce(err, "get jobs")
 	if len(jobs) == 0 {
 		return
 	}
+	pt("%d jobs\n", len(jobs))
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	t0 := time.Now()
@@ -112,8 +113,8 @@ collect:
 			defer func() {
 				wg.Done()
 				clients <- client
-				_, err = db.Exec(sp("UPDATE %s SET DONE = TRUE WHERE cat = $1 AND page = 0", jobsTableName),
-					job.Cat)
+				_, err = db.Exec(sp("UPDATE %s SET DONE = TRUE WHERE cat = $1 AND page = $2", jobsTableName),
+					job.Cat, job.Page)
 				ce(err, "update job table")
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
@@ -131,9 +132,9 @@ collect:
 			ce(err, "encode gob")
 			_, err = db.Exec(sp(`INSERT INTO %s (cat, page, gob) SELECT $1, $2, $3
 				WHERE NOT EXISTS (SELECT 1 FROM %s WHERE cat = $1 AND page = $2)`, rawTableName, rawTableName),
-				job.Cat, 0, buf.Bytes())
+				job.Cat, job.Page, buf.Bytes())
 			ce(err, "insert")
-			pt("collected cat %d page %d, %d items\n", job.Cat, 0, len(items))
+			pt("collected cat %d page %d, %d items\n", job.Cat, job.Page, len(items))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				return
 			}
