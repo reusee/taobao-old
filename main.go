@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -105,7 +106,11 @@ func main() {
 		collectCategory("")
 	*/
 
-	urls := []string{}
+	type Job struct {
+		cat  int
+		page int
+	}
+	jobs := []Job{}
 	content, err := ioutil.ReadFile("categories")
 	ce(err, "read categories file")
 	t0 := time.Now()
@@ -113,20 +118,27 @@ func main() {
 		if len(line) == 0 {
 			continue
 		}
-		catId := line[bytes.LastIndex(line, []byte(" "))+1:]
-		urls = append(urls, sp("http://s.taobao.com/list?cat=%s&sort=sale-desc", catId))
+		catStr := line[bytes.LastIndex(line, []byte(" "))+1:]
+		cat, err := strconv.Atoi(string(catStr))
+		ce(err, "parse cat id")
+		jobs = append(jobs, Job{
+			cat:  cat,
+			page: 0,
+		})
 	}
+
 	var wg sync.WaitGroup
-	wg.Add(len(urls))
-	jobs := []string{}
-	for _, url := range urls {
+	wg.Add(len(jobs))
+	newJobs := []Job{}
+	for _, job := range jobs {
 		client := <-clients
-		url := url
+		job := job
 		go func() {
 			defer func() {
 				wg.Done()
 				clients <- client
 			}()
+			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc", job.cat)
 			bs, err := hcutil.GetBytes(client, url)
 			ce(err, "get")
 			jstr, err := GetPageConfigJson(bs)
@@ -139,10 +151,10 @@ func main() {
 			buf := new(bytes.Buffer)
 			err = gob.NewEncoder(buf).Encode(items)
 			ce(err, "encode gob")
-			_, err = db.Exec("INSERT INTO raw (time, url, gob) VALUES ($1, $2, $3)",
-				time.Now(), url, buf.Bytes())
+			_, err = db.Exec("INSERT INTO raw (time, cat, page, gob) VALUES ($1, $2, $3, $4)",
+				time.Now(), job.cat, job.page, buf.Bytes())
 			ce(err, "insert")
-			pt("collected %s\n", url)
+			pt("collected %s, %d items\n", url, len(items))
 			if config.Mods["pager"].Status != "show" {
 				return
 			}
@@ -156,7 +168,10 @@ func main() {
 				maxPage = pagerData.TotalPage
 			}
 			for i := 1; i < maxPage; i++ {
-				jobs = append(jobs, sp("%s&bcoffset=0&s=%d", url, i*60))
+				newJobs = append(newJobs, Job{
+					cat:  job.cat,
+					page: i,
+				})
 			}
 		}()
 	}
