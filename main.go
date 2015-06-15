@@ -19,6 +19,7 @@ import (
 
 var (
 	ce = catch.PkgChecker("taobao")
+	ct = catch.Catch
 	pt = fmt.Printf
 	sp = fmt.Sprintf
 )
@@ -68,6 +69,7 @@ func main() {
 	ce(err, "create jobs table")
 	content, err := ioutil.ReadFile("categories")
 	ce(err, "read categories file")
+	pt("start insert first-page jobs\n")
 	for _, line := range bytes.Split(content, []byte("\n")) {
 		if len(line) == 0 {
 			continue
@@ -109,7 +111,9 @@ collect:
 	for _, job := range jobs {
 		client := <-clients
 		job := job
+		var err error
 		go func() {
+			defer ct(&err) // ignore errors
 			defer func() {
 				clients <- client
 				wg.Done()
