@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,8 +10,9 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/jackc/pgx/stdlib"
-	"github.com/jmoiron/sqlx"
+	"gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
+
 	"github.com/reusee/catch"
 	"github.com/reusee/hcutil"
 )
@@ -26,9 +26,20 @@ var (
 
 func main() {
 	// database
-	db, err := sqlx.Connect("pgx", "postgres://reus@localhost/taobao")
-	ce(err, "connect db")
-	defer db.Close()
+	session, err := mgo.Dial("localhost")
+	ce(err, "connect to db")
+	defer session.Close()
+	db := session.DB("taobao")
+	_ = db
+
+	allowDup := func(err error) error {
+		if err, ok := err.(*mgo.LastError); ok {
+			if err.Code == 11000 {
+				return nil
+			}
+		}
+		return err
+	}
 
 	// clients
 	proxies := []string{
@@ -48,7 +59,7 @@ func main() {
 	for _, addr := range proxies {
 		client, err := hcutil.NewClientSocks5("localhost:" + addr)
 		ce(err, "new proxy "+addr)
-		client.Timeout = time.Second * 16
+		client.Timeout = time.Second * 8
 		//pt("testing %s\n", addr)
 		//_, err = hcutil.GetBytes(client, "http://www.taobao.com")
 		//ce(err, "test client")
@@ -59,14 +70,22 @@ func main() {
 	now := time.Now()
 	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
 
+	jobsColle := db.C("jobs_" + dateStr)
+	err = jobsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"cat", "page"},
+		Unique: true,
+		Sparse: true,
+	})
+	ce(err, "ensure jobs collection index")
+	err = jobsColle.EnsureIndexKey("done")
+	ce(err, "ensure jobs collection done key")
+
+	type Job struct {
+		Cat, Page int
+		Done      bool
+	}
+
 	// first-page jobs
-	jobsTableName := "jobs_" + dateStr
-	_, err = db.Exec(sp(`CREATE TABLE IF NOT EXISTS %s (
-		cat BIGINT,
-		page INTEGER,
-		done BOOL NOT NULL DEFAULT FALSE,
-		PRIMARY KEY (cat, page))`, jobsTableName))
-	ce(err, "create jobs table")
 	content, err := ioutil.ReadFile("categories")
 	ce(err, "read categories file")
 	pt("start insert first-page jobs\n")
@@ -77,34 +96,37 @@ func main() {
 		catStr := line[bytes.LastIndex(line, []byte(" "))+1:]
 		cat, err := strconv.Atoi(string(catStr))
 		ce(err, "parse cat id")
-		_, err = db.Exec(sp(`INSERT INTO %s (cat, page) SELECT $1, $2
-			WHERE NOT EXISTS (SELECT 1 FROM %s WHERE cat = $1 AND page = $2)`,
-			jobsTableName, jobsTableName), cat, 0)
-		ce(err, "insert first-page job")
+		err = jobsColle.Insert(Job{
+			Cat:  cat,
+			Page: 0,
+			Done: false,
+		})
+		ce(allowDup(err), "insert job")
 	}
 	pt("first-page jobs inserted\n")
 
-	// raw table
-	rawTableName := "raws_" + dateStr
-	_, err = db.Exec(sp(`CREATE TABLE IF NOT EXISTS %s (
-		cat BIGINT,
-		page INTEGER,
-		gob BYTEA,
-		PRIMARY KEY (cat, page))`, rawTableName))
-	ce(err, "create raws table")
+	rawsColle := db.C("raws_" + dateStr)
+	err = rawsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"cat", "page"},
+		Unique: true,
+		Sparse: true,
+	})
+	ce(err, "ensure raws collection index")
+
+	type Raw struct {
+		Cat, Page int
+		Items     []Item
+	}
 
 	// collect
 collect:
-	jobs := []struct {
-		Cat  uint64
-		Page int
-	}{}
-	err = db.Select(&jobs, sp(`SELECT cat,page FROM %s WHERE done = FALSE`, jobsTableName))
+	jobs := []Job{}
+	err = jobsColle.Find(bson.M{"done": false}).All(&jobs)
 	ce(err, "get jobs")
+	pt("%d jobs\n", len(jobs))
 	if len(jobs) == 0 {
 		return
 	}
-	pt("%d jobs\n", len(jobs))
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	t0 := time.Now()
@@ -128,18 +150,18 @@ collect:
 			ce(err, "unmarshal")
 			items, err := GetItems(config.Mods["itemlist"].Data)
 			ce(err, "get items")
-			buf := new(bytes.Buffer)
-			err = gob.NewEncoder(buf).Encode(items)
-			ce(err, "encode gob")
-			_, err = db.Exec(sp(`INSERT INTO %s (cat, page, gob) SELECT $1, $2, $3
-				WHERE NOT EXISTS (SELECT 1 FROM %s WHERE cat = $1 AND page = $2)`, rawTableName, rawTableName),
-				job.Cat, job.Page, buf.Bytes())
-			ce(err, "insert")
+			err = rawsColle.Insert(Raw{
+				Cat:   job.Cat,
+				Page:  job.Page,
+				Items: items,
+			})
+			ce(allowDup(err), "insert raw")
 			pt("collected cat %d page %d, %d items\n", job.Cat, job.Page, len(items))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
-				_, err = db.Exec(sp("UPDATE %s SET done = TRUE WHERE cat = $1 AND page = $2", jobsTableName),
-					job.Cat, job.Page)
-				ce(err, "update job table")
+				_, err = jobsColle.Find(bson.M{"cat": job.Cat, "page": job.Page}).Apply(mgo.Change{
+					Update: bson.M{"done": true},
+				}, nil)
+				ce(err, "mark done")
 				return
 			}
 			var pagerData struct {
@@ -152,14 +174,17 @@ collect:
 				maxPage = pagerData.TotalPage
 			}
 			for i := 1; i < maxPage; i++ {
-				_, err = db.Exec(sp(`INSERT INTO %s (cat, page) SELECT $1, $2
-					WHERE NOT EXISTS (SELECT 1 FROM %s WHERE cat = $1 AND page = $2)`, jobsTableName, jobsTableName),
-					job.Cat, i)
-				ce(err, "insert job")
+				err = jobsColle.Insert(Job{
+					Cat:  job.Cat,
+					Page: i,
+					Done: false,
+				})
+				ce(allowDup(err), "insert job")
 			}
-			_, err = db.Exec(sp("UPDATE %s SET done = TRUE WHERE cat = $1 AND page = $2", jobsTableName),
-				job.Cat, job.Page)
-			ce(err, "update job table")
+			_, err = jobsColle.Find(bson.M{"cat": job.Cat, "page": job.Page}).Apply(mgo.Change{
+				Update: bson.M{"done": true},
+			}, nil)
+			ce(err, "mark done")
 		}()
 	}
 	wg.Wait()
