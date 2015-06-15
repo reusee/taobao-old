@@ -79,6 +79,10 @@ func main() {
 	ce(err, "ensure jobs collection index")
 	err = jobsColle.EnsureIndexKey("done")
 	ce(err, "ensure jobs collection done key")
+	err = jobsColle.EnsureIndexKey("cat")
+	ce(err, "ensure jobs collection cat key")
+	err = jobsColle.EnsureIndexKey("page")
+	ce(err, "ensure jobs collection page key")
 
 	type Job struct {
 		Cat, Page int
@@ -105,17 +109,19 @@ func main() {
 	}
 	pt("first-page jobs inserted\n")
 
-	rawsColle := db.C("raws_" + dateStr)
-	err = rawsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat", "page"},
+	itemsColle := db.C("items_" + dateStr)
+	err = itemsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"nid"},
 		Unique: true,
 		Sparse: true,
 	})
-	ce(err, "ensure raws collection index")
+	ce(err, "ensure items collection index")
 
-	type Raw struct {
-		Cat, Page int
-		Items     []Item
+	markDone := func(cat, page int) {
+		_, err = jobsColle.Find(bson.M{"cat": cat, "page": page}).Apply(mgo.Change{
+			Update: bson.M{"done": true},
+		}, nil)
+		ce(err, "mark done")
 	}
 
 	// collect
@@ -150,18 +156,13 @@ collect:
 			ce(err, "unmarshal")
 			items, err := GetItems(config.Mods["itemlist"].Data)
 			ce(err, "get items")
-			err = rawsColle.Insert(Raw{
-				Cat:   job.Cat,
-				Page:  job.Page,
-				Items: items,
-			})
-			ce(allowDup(err), "insert raw")
+			for _, item := range items {
+				err = itemsColle.Insert(item)
+				ce(err, "insert item")
+			}
 			pt("collected cat %d page %d, %d items\n", job.Cat, job.Page, len(items))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
-				_, err = jobsColle.Find(bson.M{"cat": job.Cat, "page": job.Page}).Apply(mgo.Change{
-					Update: bson.M{"done": true},
-				}, nil)
-				ce(err, "mark done")
+				markDone(job.Cat, job.Page)
 				return
 			}
 			var pagerData struct {
@@ -181,10 +182,7 @@ collect:
 				})
 				ce(allowDup(err), "insert job")
 			}
-			_, err = jobsColle.Find(bson.M{"cat": job.Cat, "page": job.Page}).Apply(mgo.Change{
-				Update: bson.M{"done": true},
-			}, nil)
-			ce(err, "mark done")
+			markDone(job.Cat, job.Page)
 		}()
 	}
 	wg.Wait()
