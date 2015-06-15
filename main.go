@@ -146,12 +146,21 @@ collect:
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			bs, err := hcutil.GetBytes(client, url)
-			ce(err, "get")
+			if err != nil {
+				pt(sp("get %s error: %v", url, err))
+				return
+			}
 			jstr, err := GetPageConfigJson(bs)
-			ce(err, "get page config")
+			if err != nil {
+				pt(sp("get %s page config error: %v", url, err))
+				return
+			}
 			var config PageConfig
 			err = json.Unmarshal(jstr, &config)
-			ce(err, "unmarshal")
+			if err != nil {
+				pt(sp("unmarshal %s json error: %v", url, err))
+				return
+			}
 			items, err := GetItems(config.Mods["itemlist"].Data)
 			ce(err, "get items")
 			for _, item := range items {
