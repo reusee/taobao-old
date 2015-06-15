@@ -139,9 +139,7 @@ collect:
 	for _, job := range jobs {
 		client := <-clients
 		job := job
-		var err error
 		go func() {
-			defer ct(&err) // ignore errors
 			defer func() {
 				clients <- client
 				wg.Done()
@@ -158,7 +156,7 @@ collect:
 			ce(err, "get items")
 			for _, item := range items {
 				err = itemsColle.Insert(item)
-				ce(err, "insert item")
+				ce(allowDup(err), "insert item")
 			}
 			pt("collected cat %d page %d, %d items\n", job.Cat, job.Page, len(items))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
