@@ -119,7 +119,7 @@ func main() {
 
 	markDone := func(cat, page int) {
 		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
-			bson.M{"done": true})
+			bson.M{"$set": bson.M{"done": true}})
 		ce(err, "mark done")
 	}
 
