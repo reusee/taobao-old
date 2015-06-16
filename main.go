@@ -118,9 +118,8 @@ func main() {
 	ce(err, "ensure items collection index")
 
 	markDone := func(cat, page int) {
-		_, err = jobsColle.Find(bson.M{"cat": cat, "page": page}).Apply(mgo.Change{
-			Update: bson.M{"done": true},
-		}, nil)
+		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
+			bson.M{"done": true})
 		ce(err, "mark done")
 	}
 
@@ -144,6 +143,7 @@ collect:
 				clients <- client
 				wg.Done()
 			}()
+			t0 := time.Now()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			bs, err := hcutil.GetBytes(client, url)
 			if err != nil {
@@ -170,7 +170,7 @@ collect:
 				err = itemsColle.Insert(item)
 				ce(allowDup(err), "insert item")
 			}
-			pt("collected cat %d page %d, %d items\n", job.Cat, job.Page, len(items))
+			pt("collected cat %d page %d, %d items, %v\n", job.Cat, job.Page, len(items), time.Now().Sub(t0))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				markDone(job.Cat, job.Page)
 				return
