@@ -182,6 +182,10 @@ collect:
 				pt(sp("unmarshal %s json error: %v", url, err))
 				return
 			}
+			if config.Mods["itemlist"].Status == "hide" { // no items
+				markDone(job.Cat, job.Page)
+				return
+			}
 			items, err := GetItems(config.Mods["itemlist"].Data)
 			if err != nil {
 				pt(sp("unmarshal item list %s error: %v", url, err))
