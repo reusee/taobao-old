@@ -82,7 +82,7 @@ func main() {
 	jobsColle := db.C("jobs_" + dateStr)
 	err = jobsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
-			"compression": true,
+			"compression": "zlib",
 		},
 	})
 	ce(ignoreExistsColle(err), "create jobs collection")
@@ -127,7 +127,7 @@ func main() {
 	itemsColle := db.C("items_" + dateStr)
 	err = itemsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
-			"compression": true,
+			"compression": "zlib",
 		},
 	})
 	ce(ignoreExistsColle(err), "create items collection")
