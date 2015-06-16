@@ -162,7 +162,10 @@ collect:
 				return
 			}
 			items, err := GetItems(config.Mods["itemlist"].Data)
-			ce(err, "get items")
+			if err != nil {
+				pt(sp("unmarshal item list %s error: %v", url, err))
+				return
+			}
 			for _, item := range items {
 				err = itemsColle.Insert(item)
 				ce(allowDup(err), "insert item")
@@ -176,7 +179,10 @@ collect:
 				TotalPage int
 			}
 			err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
-			ce(err, sp("get pager data: %s", config.Mods["pager"].Data))
+			if err != nil {
+				pt(sp("unmarshal pager %s error: %v", url, err))
+				return
+			}
 			maxPage := 10
 			if pagerData.TotalPage < maxPage {
 				maxPage = pagerData.TotalPage
