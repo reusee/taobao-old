@@ -70,7 +70,22 @@ func main() {
 	now := time.Now()
 	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
 
+	ignoreExistsColle := func(err error) error {
+		if err, ok := err.(*mgo.QueryError); ok {
+			if err.Message == "collection already exists" {
+				return nil
+			}
+		}
+		return err
+	}
+
 	jobsColle := db.C("jobs_" + dateStr)
+	err = jobsColle.Create(&mgo.CollectionInfo{
+		Extra: bson.M{
+			"compression": true,
+		},
+	})
+	ce(ignoreExistsColle(err), "create jobs collection")
 	err = jobsColle.EnsureIndex(mgo.Index{
 		Key:    []string{"cat", "page"},
 		Unique: true,
@@ -110,6 +125,12 @@ func main() {
 	pt("first-page jobs inserted\n")
 
 	itemsColle := db.C("items_" + dateStr)
+	err = itemsColle.Create(&mgo.CollectionInfo{
+		Extra: bson.M{
+			"compression": true,
+		},
+	})
+	ce(ignoreExistsColle(err), "create items collection")
 	err = itemsColle.EnsureIndex(mgo.Index{
 		Key:    []string{"nid"},
 		Unique: true,
