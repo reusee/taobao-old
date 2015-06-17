@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 
 	"gopkg.in/mgo.v2"
 
@@ -22,7 +23,12 @@ func main() {
 	defer session.Close()
 	db := session.DB("taobao")
 
-	collect(db)
+	switch os.Args[1] {
+	case "collect":
+		collect(db)
+	case "analyze":
+		analyze(db)
+	}
 }
 
 type Item struct {
@@ -57,4 +63,22 @@ type Item struct {
 	//Icon        interface{}
 	Comment_url string
 	ShopLink    string
+}
+
+func ignoreExistsColle(err error) error {
+	if err, ok := err.(*mgo.QueryError); ok {
+		if err.Message == "collection already exists" {
+			return nil
+		}
+	}
+	return err
+}
+
+func allowDup(err error) error {
+	if err, ok := err.(*mgo.LastError); ok {
+		if err.Code == 11000 {
+			return nil
+		}
+	}
+	return err
 }

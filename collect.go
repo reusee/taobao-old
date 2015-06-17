@@ -16,15 +16,6 @@ import (
 )
 
 func collect(db *mgo.Database) {
-	allowDup := func(err error) error {
-		if err, ok := err.(*mgo.LastError); ok {
-			if err.Code == 11000 {
-				return nil
-			}
-		}
-		return err
-	}
-
 	// client provider
 	clients := make(chan *http.Client, 1024)
 	go func() {
@@ -66,15 +57,6 @@ func collect(db *mgo.Database) {
 
 	now := time.Now()
 	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
-
-	ignoreExistsColle := func(err error) error {
-		if err, ok := err.(*mgo.QueryError); ok {
-			if err.Message == "collection already exists" {
-				return nil
-			}
-		}
-		return err
-	}
 
 	jobsColle := db.C("jobs_" + dateStr)
 	err := jobsColle.Create(&mgo.CollectionInfo{
