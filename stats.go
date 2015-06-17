@@ -9,7 +9,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func analyze(db *mgo.Database) {
+func stats(db *mgo.Database) {
 	dateStr := "20150616"
 	itemsColle := db.C("items_" + dateStr)
 

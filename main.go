@@ -26,8 +26,8 @@ func main() {
 	switch os.Args[1] {
 	case "collect":
 		collect(db)
-	case "analyze":
-		analyze(db)
+	case "stats":
+		stats(db)
 	}
 }
 
