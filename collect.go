@@ -47,13 +47,14 @@ func collect(db *mgo.Database) {
 				}
 			}()
 			select {
-			case <-time.After(time.Second * 4):
+			case <-time.After(time.Second * 3):
 			case <-done:
 				pt("client %s ok\n", addr)
 				clients <- client
 			}
 		}
 	}()
+	go provideFreeProxyClients(clients)
 
 	now := time.Now()
 	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
@@ -140,7 +141,6 @@ collect:
 		job := job
 		go func() {
 			defer func() {
-				clients <- client
 				wg.Done()
 			}()
 			t0 := time.Now()
@@ -163,6 +163,7 @@ collect:
 			}
 			if config.Mods["itemlist"].Status == "hide" { // no items
 				markDone(job.Cat, job.Page)
+				clients <- client
 				return
 			}
 			items, err := GetItems(config.Mods["itemlist"].Data)
@@ -177,6 +178,7 @@ collect:
 			pt("collected cat %d page %d, %d items, %v\n", job.Cat, job.Page, len(items), time.Now().Sub(t0))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				markDone(job.Cat, job.Page)
+				clients <- client
 				return
 			}
 			var pagerData struct {
@@ -200,6 +202,7 @@ collect:
 				ce(allowDup(err), "insert job")
 			}
 			markDone(job.Cat, job.Page)
+			clients <- client
 		}()
 	}
 	wg.Wait()

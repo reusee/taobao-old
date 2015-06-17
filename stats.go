@@ -10,7 +10,7 @@ import (
 )
 
 func stats(db *mgo.Database) {
-	dateStr := "20150616"
+	dateStr := "20150617"
 	itemsColle := db.C("items_" + dateStr)
 
 	catStatsColle := db.C("cat_stats_" + dateStr)
