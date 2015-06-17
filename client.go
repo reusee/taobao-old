@@ -9,7 +9,6 @@ import (
 
 func ClientsProvider() (clientsIn chan<- *http.Client, clientsOut <-chan *http.Client, killClientsChan chan struct{}) {
 	clientsIn, clientsOut, killClientsChan = NewClientsChan()
-	defer close(killClientsChan)
 	go func() {
 		proxies := []string{
 			"8022",
