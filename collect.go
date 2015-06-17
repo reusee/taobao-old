@@ -113,13 +113,16 @@ collect:
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
 	jobsDone = 0
+	sem := make(chan struct{}, 256)
 	for _, job := range jobs {
 		client := <-clientsOut
 		job := job
+		sem <- struct{}{}
 		go func() {
 			defer func() {
 				wg.Done()
 				atomic.AddInt64(&jobsDone, 1)
+				<-sem
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			bs, err := hcutil.GetBytes(client, url)
