@@ -65,20 +65,7 @@ type Item struct {
 	ShopLink    string
 }
 
-func ignoreExistsColle(err error) error {
-	if err, ok := err.(*mgo.QueryError); ok {
-		if err.Message == "collection already exists" {
-			return nil
-		}
-	}
-	return err
-}
-
-func allowDup(err error) error {
-	if err, ok := err.(*mgo.LastError); ok {
-		if err.Code == 11000 {
-			return nil
-		}
-	}
-	return err
+type ItemCat struct {
+	Nid int
+	Cat int
 }

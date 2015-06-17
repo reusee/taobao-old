@@ -33,6 +33,8 @@ func stats(db *mgo.Database) {
 	}
 	catStats := make(map[int]*CatStat)
 
+	itemCatsColle := db.C("item_cats_" + dateStr)
+
 	query := itemsColle.Find(nil)
 	iter := query.Iter()
 	var item Item
@@ -44,21 +46,26 @@ func stats(db *mgo.Database) {
 			pt("%10d %v\n", n, time.Now().Sub(t0))
 		}
 
-		cat, err := strconv.Atoi(item.Category)
-		ce(err, "parse category")
-		if _, ok := catStats[cat]; !ok {
-			catStats[cat] = &CatStat{
-				Cat: cat,
-			}
-		}
+		nid, err := strconv.Atoi(item.Nid)
+		ce(err, sp("parse nid %s", item.Nid))
 		item.View_sales = strings.Replace(item.View_sales, "人收货", "", -1)
 		count, err := strconv.Atoi(item.View_sales)
 		ce(err, sp("parse count %s", item.View_sales))
-		catStats[cat].Count += count
 		price, err := strconv.ParseFloat(item.View_price, 64)
 		ce(err, sp("parse price %s", item.View_price))
 		amount := price * float64(count)
-		catStats[cat].Amount += amount
+		var itemCats []ItemCat
+		err = itemCatsColle.Find(bson.M{"nid": nid}).All(&itemCats)
+		ce(err, "get item cats")
+		for _, itemCat := range itemCats {
+			if _, ok := catStats[itemCat.Cat]; !ok {
+				catStats[itemCat.Cat] = &CatStat{
+					Cat: itemCat.Cat,
+				}
+			}
+			catStats[itemCat.Cat].Count += count
+			catStats[itemCat.Cat].Amount += amount
+		}
 
 	}
 

@@ -118,10 +118,6 @@ func collect(db *mgo.Database) {
 	})
 	ce(err, "ensure items collection index")
 
-	type ItemCat struct {
-		Nid int
-		Cat int
-	}
 	itemCatsColle := db.C("item_cats_" + dateStr)
 	err = itemCatsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
@@ -134,6 +130,8 @@ func collect(db *mgo.Database) {
 		Sparse: true,
 	})
 	ce(err, "ensure item cats collection unique index")
+	err = itemCatsColle.EnsureIndexKey("nid")
+	ce(err, "ensure item cats collection index")
 
 	markDone := func(cat, page int) {
 		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
