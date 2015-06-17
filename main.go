@@ -31,6 +31,8 @@ func main() {
 		stats(db)
 	case "cats":
 		collectCategories(http.DefaultClient)
+	case "foo":
+		foo(db)
 	}
 }
 
