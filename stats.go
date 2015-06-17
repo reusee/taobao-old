@@ -3,7 +3,6 @@ package main
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -25,7 +24,6 @@ func stats(db *mgo.Database) {
 		Unique: true,
 		Sparse: true,
 	})
-	catStatsColle.RemoveAll(nil)
 	type CatStat struct {
 		Cat    int
 		Count  int
@@ -36,20 +34,19 @@ func stats(db *mgo.Database) {
 	query := itemsColle.Find(nil)
 	iter := query.Iter()
 	var item Item
-	t0 := time.Now()
-	n := 0
 	for iter.Next(&item) {
-		n++
-		if n%30000 == 0 {
-			pt("%10d %v\n", n, time.Now().Sub(t0))
-		}
-
 		item.View_sales = strings.Replace(item.View_sales, "人收货", "", -1)
 		count, err := strconv.Atoi(item.View_sales)
 		ce(err, sp("parse count %s", item.View_sales))
 		price, err := strconv.ParseFloat(item.View_price, 64)
 		ce(err, sp("parse price %s", item.View_price))
 		amount := price * float64(count)
+		/*
+			if amount > 10000000 {
+				pt("%s\n%d %f\n", item.Title, count, price)
+				pt("http://item.taobao.com/item.htm?id=%s\n", item.Nid)
+			}
+		*/
 		for _, cat := range item.Cats {
 			if _, ok := catStats[cat]; !ok {
 				catStats[cat] = &CatStat{
