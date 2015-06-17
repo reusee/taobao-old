@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
 	"gopkg.in/mgo.v2"
@@ -28,6 +29,8 @@ func main() {
 		collect(db)
 	case "stats":
 		stats(db)
+	case "cats":
+		collectCategories(http.DefaultClient)
 	}
 }
 
