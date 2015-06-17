@@ -32,6 +32,8 @@ func main() {
 }
 
 type Item struct {
+	Cats []int
+
 	//I2iTags       map[string]interface{}
 	Nid           string
 	Category      string
@@ -63,9 +65,4 @@ type Item struct {
 	//Icon        interface{}
 	Comment_url string
 	ShopLink    string
-}
-
-type ItemCat struct {
-	Nid int
-	Cat int
 }

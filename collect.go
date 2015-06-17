@@ -118,21 +118,6 @@ func collect(db *mgo.Database) {
 	})
 	ce(err, "ensure items collection index")
 
-	itemCatsColle := db.C("item_cats_" + dateStr)
-	err = itemCatsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		}})
-	ce(ignoreExistsColle(err), "create item cats collection")
-	err = itemCatsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"nid", "cat"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure item cats collection unique index")
-	err = itemCatsColle.EnsureIndexKey("nid")
-	ce(err, "ensure item cats collection index")
-
 	markDone := func(cat, page int) {
 		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
 			bson.M{"$set": bson.M{"done": true}})
@@ -203,13 +188,14 @@ collect:
 			for _, item := range items {
 				err = itemsColle.Insert(item)
 				ce(allowDup(err), "insert item")
-				nid, err := strconv.Atoi(item.Nid)
-				ce(err, sp("parse nid %s", item.Nid))
-				err = itemCatsColle.Insert(ItemCat{
-					Nid: nid,
-					Cat: job.Cat,
+				err = itemsColle.Update(bson.M{
+					"nid": item.Nid,
+				}, bson.M{
+					"$addToSet": bson.M{
+						"cats": job.Cat,
+					},
 				})
-				ce(allowDup(err), "insert item cat")
+				ce(err, "add cat to item")
 			}
 			atomic.AddUint64(&itemsCount, uint64(len(items)))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
