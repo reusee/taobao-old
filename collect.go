@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/reusee/hcutil"
@@ -124,6 +125,19 @@ func collect(db *mgo.Database) {
 		ce(err, "mark done")
 	}
 
+	// status
+	var itemsCount uint64
+	var jobsTotal int64
+	var jobsDone int64
+	go func() {
+		for range time.NewTicker(time.Second * 3).C {
+			pt("%d / %d jobs done. %d items collected\n",
+				atomic.LoadInt64(&jobsDone),
+				jobsTotal,
+				atomic.LoadUint64(&itemsCount))
+		}
+	}()
+
 	// collect
 collect:
 	jobs := []Job{}
@@ -135,15 +149,16 @@ collect:
 	}
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
-	t0 := time.Now()
+	jobsTotal = int64(len(jobs))
+	jobsDone = 0
 	for _, job := range jobs {
 		client := <-clientsOut
 		job := job
 		go func() {
 			defer func() {
 				wg.Done()
+				atomic.AddInt64(&jobsDone, 1)
 			}()
-			t0 := time.Now()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			bs, err := hcutil.GetBytes(client, url)
 			if err != nil {
@@ -175,7 +190,7 @@ collect:
 				err = itemsColle.Insert(item)
 				ce(allowDup(err), "insert item")
 			}
-			pt("collected cat %d page %d, %d items, %v\n", job.Cat, job.Page, len(items), time.Now().Sub(t0))
+			atomic.AddUint64(&itemsCount, uint64(len(items)))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				markDone(job.Cat, job.Page)
 				clientsIn <- client
@@ -206,7 +221,6 @@ collect:
 		}()
 	}
 	wg.Wait()
-	pt("collect %d page in %v\n", len(jobs), time.Now().Sub(t0))
 	goto collect
 
 }
