@@ -75,4 +75,5 @@ type Item struct {
 type Raw struct {
 	Cat, Page int
 	Items     []Item
+	Html      []byte
 }

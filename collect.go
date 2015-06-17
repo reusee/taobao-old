@@ -181,6 +181,7 @@ collect:
 				Cat:   job.Cat,
 				Page:  job.Page,
 				Items: items,
+				Html:  bs,
 			})
 			ce(err, "insert raw")
 			atomic.AddUint64(&itemsCount, uint64(len(items)))
