@@ -9,7 +9,7 @@ import (
 	"github.com/reusee/hcutil"
 )
 
-func provideFreeProxyClients(clients chan *http.Client) {
+func provideFreeProxyClients(clients chan<- *http.Client) {
 	entryPattern := regexp.MustCompile(`<tr><b><td>[0-9]+</td><td>([0-9.]+)</td><td>([0-9]+)</td>`)
 	for page := 1; page <= 10; page++ {
 		pageUrl := sp("http://www.proxy.com.ru/list_%d.html", page)
@@ -37,7 +37,7 @@ func provideFreeProxyClients(clients chan *http.Client) {
 				}
 			}()
 			select {
-			case <-time.After(time.Second * 3):
+			case <-time.After(time.Second * 4):
 			case <-done:
 				pt("client %s ok\n", addr)
 				clients <- client
