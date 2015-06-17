@@ -109,8 +109,7 @@ func collect(db *mgo.Database) {
 	err = itemsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
 			"compression": "zlib",
-		},
-	})
+		}})
 	ce(ignoreExistsColle(err), "create items collection")
 	err = itemsColle.EnsureIndex(mgo.Index{
 		Key:    []string{"nid"},
@@ -118,6 +117,23 @@ func collect(db *mgo.Database) {
 		Sparse: true,
 	})
 	ce(err, "ensure items collection index")
+
+	type ItemCat struct {
+		Nid int
+		Cat int
+	}
+	itemCatsColle := db.C("item_cats_" + dateStr)
+	err = itemCatsColle.Create(&mgo.CollectionInfo{
+		Extra: bson.M{
+			"compression": "zlib",
+		}})
+	ce(ignoreExistsColle(err), "create item cats collection")
+	err = itemCatsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"nid", "cat"},
+		Unique: true,
+		Sparse: true,
+	})
+	ce(err, "ensure item cats collection unique index")
 
 	markDone := func(cat, page int) {
 		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
@@ -189,6 +205,13 @@ collect:
 			for _, item := range items {
 				err = itemsColle.Insert(item)
 				ce(allowDup(err), "insert item")
+				nid, err := strconv.Atoi(item.Nid)
+				ce(err, sp("parse nid %s", item.Nid))
+				err = itemCatsColle.Insert(ItemCat{
+					Nid: nid,
+					Cat: job.Cat,
+				})
+				ce(allowDup(err), "insert item cat")
 			}
 			atomic.AddUint64(&itemsCount, uint64(len(items)))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {

@@ -63,8 +63,8 @@ func stats(db *mgo.Database) {
 	}
 
 	for _, stat := range catStats {
-		err = catStatsColle.Insert(stat)
-		ce(allowDup(err), "insert cat stat")
+		_, err = catStatsColle.Upsert(bson.M{"cat": stat.Cat}, stat)
+		ce(err, "insert cat stat")
 	}
 
 }
