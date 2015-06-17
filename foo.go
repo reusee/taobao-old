@@ -1,9 +1,14 @@
 package main
 
-import "gopkg.in/mgo.v2"
+import (
+	"time"
+
+	"gopkg.in/mgo.v2"
+)
 
 func foo(db *mgo.Database) {
-	dateStr := "20150617"
+	now := time.Now()
+	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
 	itemsColle := db.C("items_" + dateStr)
 
 	query := itemsColle.Find(nil)
@@ -11,7 +16,7 @@ func foo(db *mgo.Database) {
 	var item Item
 	for iter.Next(&item) {
 		for _, cat := range item.Cats {
-			if cat == 50043648 {
+			if cat == 55070016 {
 				pt("%s %s\n", item.View_sales, item.Nid)
 			}
 		}

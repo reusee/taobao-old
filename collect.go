@@ -81,6 +81,20 @@ func collect(db *mgo.Database) {
 	})
 	ce(err, "ensure items collection index")
 
+	rawsColle := db.C("raws_" + dateStr)
+	err = rawsColle.Create(&mgo.CollectionInfo{
+		Extra: bson.M{
+			"compression": "zlib",
+		},
+	})
+	ce(ignoreExistsColle(err), "create raws collection")
+	err = rawsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"cat", "page"},
+		Unique: true,
+		Sparse: true,
+	})
+	ce(err, "ensure raws index")
+
 	markDone := func(cat, page int) {
 		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
 			bson.M{"$set": bson.M{"done": true}})
@@ -163,6 +177,12 @@ collect:
 				})
 				ce(err, "add cat to item")
 			}
+			err = rawsColle.Insert(Raw{
+				Cat:   job.Cat,
+				Page:  job.Page,
+				Items: items,
+			})
+			ce(err, "insert raw")
 			atomic.AddUint64(&itemsCount, uint64(len(items)))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				markDone(job.Cat, job.Page)

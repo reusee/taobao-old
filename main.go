@@ -71,3 +71,8 @@ type Item struct {
 	Comment_url string
 	ShopLink    string
 }
+
+type Raw struct {
+	Cat, Page int
+	Items     []Item
+}

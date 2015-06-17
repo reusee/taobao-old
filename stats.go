@@ -3,13 +3,15 @@ package main
 import (
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 func stats(db *mgo.Database) {
-	dateStr := "20150617"
+	now := time.Now()
+	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
 	itemsColle := db.C("items_" + dateStr)
 
 	catStatsColle := db.C("cat_stats_" + dateStr)
