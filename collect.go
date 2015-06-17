@@ -162,18 +162,18 @@ collect:
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			bs, err := hcutil.GetBytes(client, url)
 			if err != nil {
-				pt(sp("get %s error: %v", url, err))
+				pt(sp("get %s error: %v\n", url, err))
 				return
 			}
 			jstr, err := GetPageConfigJson(bs)
 			if err != nil {
-				pt(sp("get %s page config error: %v", url, err))
+				pt(sp("get %s page config error: %v\n", url, err))
 				return
 			}
 			var config PageConfig
 			err = json.Unmarshal(jstr, &config)
 			if err != nil {
-				pt(sp("unmarshal %s json error: %v", url, err))
+				pt(sp("unmarshal %s json error: %v\n", url, err))
 				return
 			}
 			if config.Mods["itemlist"].Status == "hide" { // no items
@@ -183,7 +183,7 @@ collect:
 			}
 			items, err := GetItems(config.Mods["itemlist"].Data)
 			if err != nil {
-				pt(sp("unmarshal item list %s error: %v", url, err))
+				pt(sp("unmarshal item list %s error: %v\n", url, err))
 				return
 			}
 			for _, item := range items {
@@ -201,7 +201,7 @@ collect:
 			}
 			err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
 			if err != nil {
-				pt(sp("unmarshal pager %s error: %v", url, err))
+				pt(sp("unmarshal pager %s error: %v\n", url, err))
 				return
 			}
 			maxPage := 10
