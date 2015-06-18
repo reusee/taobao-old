@@ -19,7 +19,7 @@ var (
 
 func main() {
 	// database
-	session, err := mgo.Dial("localhost")
+	session, err := mgo.Dial("127.0.0.1")
 	ce(err, "connect to db")
 	defer session.Close()
 	db := session.DB("taobao")
