@@ -3,18 +3,15 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"time"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
-func foo(db *mgo.Database) {
-	now := time.Now()
-	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
+func foo(db *mgo.Database, date string) {
 
 	/*
-		itemsColle := db.C("items_" + dateStr)
+		itemsColle := db.C("items_" + date)
 		query := itemsColle.Find(nil)
 		iter := query.Iter()
 		var item Item
@@ -27,7 +24,7 @@ func foo(db *mgo.Database) {
 		}
 	*/
 
-	rawsColle := db.C("raws_" + dateStr)
+	rawsColle := db.C("raws_" + date)
 	query := rawsColle.Find(bson.M{"cat": 50992010})
 	iter := query.Iter()
 	var raw Raw

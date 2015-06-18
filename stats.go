@@ -3,18 +3,15 @@ package main
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
-func stats(db *mgo.Database) {
-	now := time.Now()
-	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
-	itemsColle := db.C("items_" + dateStr)
+func stats(db *mgo.Database, date string) {
+	itemsColle := db.C("items_" + date)
 
-	catStatsColle := db.C("cat_stats_" + dateStr)
+	catStatsColle := db.C("cat_stats_" + date)
 	err := catStatsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
 			"compression": "zlib",

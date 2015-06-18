@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
 	"gopkg.in/mgo.v2"
 
@@ -24,15 +25,18 @@ func main() {
 	defer session.Close()
 	db := session.DB("taobao")
 
+	now := time.Now()
+	date := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
+
 	switch os.Args[1] {
 	case "collect":
-		collect(db)
+		collect(db, date)
 	case "stats":
-		stats(db)
+		stats(db, date)
 	case "cats":
 		collectCategories(http.DefaultClient)
 	case "foo":
-		foo(db)
+		foo(db, date)
 	}
 }
 

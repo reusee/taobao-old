@@ -15,15 +15,12 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func collect(db *mgo.Database) {
+func collect(db *mgo.Database, date string) {
 	// client provider
 	clientsIn, clientsOut, killClientsChan := ClientsProvider()
 	defer close(killClientsChan)
 
-	now := time.Now()
-	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
-
-	jobsColle := db.C("jobs_" + dateStr)
+	jobsColle := db.C("jobs_" + date)
 	err := jobsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
 			"compression": "zlib",
@@ -68,7 +65,7 @@ func collect(db *mgo.Database) {
 	}
 	pt("first-page jobs inserted\n")
 
-	itemsColle := db.C("items_" + dateStr)
+	itemsColle := db.C("items_" + date)
 	err = itemsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
 			"compression": "zlib",
@@ -81,7 +78,7 @@ func collect(db *mgo.Database) {
 	})
 	ce(err, "ensure items collection index")
 
-	rawsColle := db.C("raws_" + dateStr)
+	rawsColle := db.C("raws_" + date)
 	err = rawsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
 			"compression": "zlib",
