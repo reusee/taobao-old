@@ -35,4 +35,12 @@ func checkSchema(db *sql.DB, date string) {
 		PRIMARY KEY (nid, cat)
 	)`, date))
 	ce(err, "create item cats table")
+
+	_, err = db.Exec(sp(`CREATE TABLE IF NOT EXISTS cat_stats_%s (
+		cat BIGINT PRIMARY KEY,
+		count BIGINT,
+		amount DOUBLE PRECISION
+	)`, date))
+	ce(err, "create cat stats table")
+
 }

@@ -33,7 +33,7 @@ func main() {
 	case "collect":
 		collect(db, date)
 	case "stats":
-		//stats(db) //TODO
+		stats(db, date)
 	case "cats":
 		collectCategories(http.DefaultClient)
 	case "foo":
