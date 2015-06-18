@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/lib/pq"
 )
 
 func dumpUrl(rawUrl string) {
@@ -40,6 +41,24 @@ func ignoreExistsColle(err error) error {
 func allowDup(err error) error {
 	if err, ok := err.(*mgo.LastError); ok {
 		if err.Code == 11000 {
+			return nil
+		}
+	}
+	return err
+}
+
+func allowDupTable(err error) error {
+	if err, ok := err.(*pq.Error); ok {
+		if err.Code.Name() == "duplicate_table" {
+			return nil
+		}
+	}
+	return err
+}
+
+func allowUniqVio(err error) error {
+	if err, ok := err.(*pq.Error); ok {
+		if err.Code.Name() == "unique_violation" {
 			return nil
 		}
 	}

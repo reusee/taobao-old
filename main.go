@@ -1,12 +1,13 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 
-	"gopkg.in/mgo.v2"
-
+	_ "github.com/lib/pq"
 	"github.com/reusee/catch"
 )
 
@@ -19,20 +20,24 @@ var (
 
 func main() {
 	// database
-	session, err := mgo.Dial("localhost")
+	db, err := sql.Open("postgres", "user=reus dbname=taobao sslmode=disable")
 	ce(err, "connect to db")
-	defer session.Close()
-	db := session.DB("taobao")
+	defer db.Close()
+	db.SetMaxIdleConns(64)
+
+	now := time.Now()
+	date := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
+	checkSchema(db, date)
 
 	switch os.Args[1] {
 	case "collect":
-		collect(db)
+		collect(db, date)
 	case "stats":
-		stats(db)
+		//stats(db) //TODO
 	case "cats":
 		collectCategories(http.DefaultClient)
 	case "foo":
-		foo(db)
+		//foo(db) //TODO
 	}
 }
 

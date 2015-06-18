@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,37 +12,12 @@ import (
 	"time"
 
 	"github.com/reusee/hcutil"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
-func collect(db *mgo.Database) {
+func collect(db *sql.DB, date string) {
 	// client provider
 	clientsIn, clientsOut, killClientsChan := ClientsProvider()
 	defer close(killClientsChan)
-
-	now := time.Now()
-	dateStr := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
-
-	jobsColle := db.C("jobs_" + dateStr)
-	err := jobsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		},
-	})
-	ce(ignoreExistsColle(err), "create jobs collection")
-	err = jobsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat", "page"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure jobs collection index")
-	err = jobsColle.EnsureIndexKey("done")
-	ce(err, "ensure jobs collection done key")
-	err = jobsColle.EnsureIndexKey("cat")
-	ce(err, "ensure jobs collection cat key")
-	err = jobsColle.EnsureIndexKey("page")
-	ce(err, "ensure jobs collection page key")
 
 	type Job struct {
 		Cat, Page int
@@ -59,47 +35,18 @@ func collect(db *mgo.Database) {
 		catStr := line[bytes.LastIndex(line, []byte(" "))+1:]
 		cat, err := strconv.Atoi(string(catStr))
 		ce(err, "parse cat id")
-		err = jobsColle.Insert(Job{
-			Cat:  cat,
-			Page: 0,
-			Done: false,
-		})
-		ce(allowDup(err), "insert job")
+		_, err = db.Exec(sp(`INSERT INTO jobs_%s (cat, page) VALUES ($1, 0)`, date),
+			cat)
+		ce(allowUniqVio(err), "insert job")
 	}
 	pt("first-page jobs inserted\n")
 
-	itemsColle := db.C("items_" + dateStr)
-	err = itemsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		}})
-	ce(ignoreExistsColle(err), "create items collection")
-	err = itemsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"nid"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure items collection index")
-
-	rawsColle := db.C("raws_" + dateStr)
-	err = rawsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		},
-	})
-	ce(ignoreExistsColle(err), "create raws collection")
-	err = rawsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat", "page"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure raws index")
-
 	markDone := func(cat, page int) {
-		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
-			bson.M{"$set": bson.M{"done": true}})
+		_, err := db.Exec(sp(`UPDATE jobs_%s SET done = true WHERE cat = $1 AND page = $2`, date),
+			cat, page)
 		ce(err, "mark done")
 	}
+	_ = markDone
 
 	// status
 	var itemsCount uint64
@@ -117,12 +64,20 @@ func collect(db *mgo.Database) {
 	// collect
 collect:
 	jobs := []Job{}
-	err = jobsColle.Find(bson.M{"done": false}).All(&jobs)
-	ce(err, "get jobs")
+	rows, err := db.Query(sp(`SELECT cat, page FROM jobs_%s WHERE done = false`, date))
+	ce(err, "query")
+	for rows.Next() {
+		var job Job
+		ce(rows.Scan(&job.Cat, &job.Page), "scan")
+		jobs = append(jobs, job)
+	}
+	ce(rows.Err(), "get rows")
+	rows.Close()
 	pt("%d jobs\n", len(jobs))
 	if len(jobs) == 0 {
 		return
 	}
+
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
@@ -166,24 +121,20 @@ collect:
 				return
 			}
 			for _, item := range items {
-				err = itemsColle.Insert(item)
-				ce(allowDup(err), "insert item")
-				err = itemsColle.Update(bson.M{
-					"nid": item.Nid,
-				}, bson.M{
-					"$addToSet": bson.M{
-						"cats": job.Cat,
-					},
-				})
-				ce(err, "add cat to item")
+				nid, err := strconv.Atoi(item.Nid)
+				ce(err, sp("parse nid %s", item.Nid))
+				jsonBs, err := json.Marshal(item)
+				ce(err, "marshal item")
+				_, err = db.Exec(sp(`INSERT INTO items_%s (nid, raw) VALUES ($1, $2)`, date),
+					nid, jsonBs)
+				ce(allowUniqVio(err), "insert item")
+				_, err = db.Exec(sp(`INSERT INTO item_cats_%s (nid, cat) VALUES ($1, $2)`, date),
+					nid, job.Cat)
+				ce(allowUniqVio(err), "insert item cat")
 			}
-			err = rawsColle.Insert(Raw{
-				Cat:   job.Cat,
-				Page:  job.Page,
-				Items: items,
-				Html:  bs,
-			})
-			ce(err, "insert raw")
+			_, err = db.Exec(sp(`INSERT INTO htmls_%s (cat, page, html) VALUES ($1, $2, $3)`, date),
+				job.Cat, job.Page, bs)
+			ce(allowUniqVio(err), "insert html")
 			atomic.AddUint64(&itemsCount, uint64(len(items)))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				markDone(job.Cat, job.Page)
@@ -203,12 +154,9 @@ collect:
 				maxPage = pagerData.TotalPage
 			}
 			for i := 1; i < maxPage; i++ {
-				err = jobsColle.Insert(Job{
-					Cat:  job.Cat,
-					Page: i,
-					Done: false,
-				})
-				ce(allowDup(err), "insert job")
+				_, err = db.Exec(sp(`INSERT INTO jobs_%s (cat, page) VALUES ($1, $2)`, date),
+					job.Cat, i)
+				ce(allowUniqVio(err), "insert job")
 			}
 			markDone(job.Cat, job.Page)
 			clientsIn <- client
