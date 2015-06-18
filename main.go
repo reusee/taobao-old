@@ -37,7 +37,8 @@ func main() {
 }
 
 type Item struct {
-	Cats []int
+	Cats    []int
+	Sources []Source
 
 	//I2iTags       map[string]interface{}
 	Nid           string
@@ -76,4 +77,8 @@ type Raw struct {
 	Cat, Page int
 	Items     []Item
 	Html      []byte
+}
+
+type Source struct {
+	Cat, Page int
 }
