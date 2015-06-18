@@ -115,27 +115,23 @@ collect:
 				clientsIn <- client
 				return
 			}
-			items, err := GetItems(config.Mods["itemlist"].Data)
+			infos, err := GetItems(config.Mods["itemlist"].Data)
 			if err != nil {
 				pt(sp("unmarshal item list %s error: %v\n", url, err))
 				return
 			}
-			for _, item := range items {
-				nid, err := strconv.Atoi(item.Nid)
-				ce(err, sp("parse nid %s", item.Nid))
-				jsonBs, err := json.Marshal(item)
-				ce(err, "marshal item")
+			for _, info := range infos {
 				_, err = db.Exec(sp(`INSERT INTO items_%s (nid, raw) VALUES ($1, $2)`, date),
-					nid, jsonBs)
+					info.Nid, info.Json)
 				ce(allowUniqVio(err), "insert item")
 				_, err = db.Exec(sp(`INSERT INTO item_cats_%s (nid, cat) VALUES ($1, $2)`, date),
-					nid, job.Cat)
+					info.Nid, job.Cat)
 				ce(allowUniqVio(err), "insert item cat")
 			}
 			_, err = db.Exec(sp(`INSERT INTO htmls_%s (cat, page, html) VALUES ($1, $2, $3)`, date),
 				job.Cat, job.Page, bs)
 			ce(allowUniqVio(err), "insert html")
-			atomic.AddUint64(&itemsCount, uint64(len(items)))
+			atomic.AddUint64(&itemsCount, uint64(len(infos)))
 			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 				markDone(job.Cat, job.Page)
 				clientsIn <- client
@@ -194,17 +190,36 @@ type PageConfig struct {
 	}
 }
 
-func GetItems(data []byte) ([]Item, error) {
+type ItemInfo struct {
+	Nid  int
+	Json []byte
+}
+
+func GetItems(data []byte) (infos []ItemInfo, err error) {
+	defer ct(&err)
 	var itemData struct {
-		PostFeeText, Trace          string
-		Auctions, RecommendAuctions []Item
-		IsSameStyleView             bool
-		Sellers                     []interface{}
-		Query                       string
+		//PostFeeText, Trace          string
+		//Auctions, RecommendAuctions []Item
+		//IsSameStyleView             bool
+		//Sellers                     []interface{}
+		//Query                       string
+		Auctions []json.RawMessage
 	}
-	err := json.Unmarshal(data, &itemData)
-	if err != nil {
-		return nil, makeErr(err, "unmarshal")
+	err = json.Unmarshal(data, &itemData)
+	ce(err, "unmarshal")
+	for _, msg := range itemData.Auctions {
+		var data struct {
+			Nid string
+		}
+		err = json.Unmarshal(msg, &data)
+		ce(err, "unmarshal")
+		nid, err := strconv.Atoi(data.Nid)
+		ce(err, sp("parse nid %s", data.Nid))
+		infos = append(infos, ItemInfo{
+			Nid:  nid,
+			Json: []byte(msg),
+		})
 	}
-	return itemData.Auctions, nil
+
+	return infos, nil
 }
