@@ -34,6 +34,7 @@ func provideFreeProxyClients(clients chan<- *http.Client) {
 					clients <- client
 				}
 			*/
+			time.Sleep(time.Millisecond * 300)
 			clients <- client
 		}
 	}

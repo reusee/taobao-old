@@ -17,7 +17,7 @@ import (
 
 func collect(db *mgo.Database, date string) {
 	// client provider
-	clientsIn, clientsOut, killClientsChan := ClientsProvider()
+	clientsIn, badClients, clientsOut, killClientsChan := ClientsProvider()
 	defer close(killClientsChan)
 
 	jobsColle := db.C("jobs_" + date)
@@ -139,17 +139,20 @@ collect:
 			bs, err := hcutil.GetBytes(client, url)
 			if err != nil {
 				pt(sp("get %s error: %v\n", url, err))
+				badClients <- client
 				return
 			}
 			jstr, err := GetPageConfigJson(bs)
 			if err != nil {
 				pt(sp("get %s page config error: %v\n", url, err))
+				badClients <- client
 				return
 			}
 			var config PageConfig
 			err = json.Unmarshal(jstr, &config)
 			if err != nil {
 				pt(sp("unmarshal %s json error: %v\n", url, err))
+				badClients <- client
 				return
 			}
 			if config.Mods["itemlist"].Status == "hide" { // no items
@@ -160,6 +163,7 @@ collect:
 			items, err := GetItems(config.Mods["itemlist"].Data)
 			if err != nil {
 				pt(sp("unmarshal item list %s error: %v\n", url, err))
+				badClients <- client
 				return
 			}
 			for _, item := range items {
@@ -196,6 +200,7 @@ collect:
 			err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
 			if err != nil {
 				pt(sp("unmarshal pager %s error: %v\n", url, err))
+				badClients <- client
 				return
 			}
 			maxPage := 10

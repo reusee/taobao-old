@@ -7,8 +7,12 @@ import (
 	"github.com/reusee/hcutil"
 )
 
-func ClientsProvider() (clientsIn chan<- *http.Client, clientsOut <-chan *http.Client, killClientsChan chan struct{}) {
+func ClientsProvider() (clientsIn, badClients chan<- *http.Client, clientsOut <-chan *http.Client, killClientsChan chan struct{}) {
 	clientsIn, clientsOut, killClientsChan = NewClientsChan()
+	bad := make(chan *http.Client)
+	badClients = bad
+
+	// local ss proxies
 	go func() {
 		proxies := []string{
 			"8022",
@@ -45,7 +49,20 @@ func ClientsProvider() (clientsIn chan<- *http.Client, clientsOut <-chan *http.C
 			}
 		}
 	}()
+
+	// free proxies
 	go provideFreeProxyClients(clientsIn)
+
+	// reborn
+	go func() {
+		logs := make(map[*http.Client]int)
+		for client := range bad {
+			if logs[client] < 3 {
+				clientsIn <- client
+				logs[client]++
+			}
+		}
+	}()
 
 	return
 }

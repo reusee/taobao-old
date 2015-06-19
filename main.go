@@ -9,6 +9,7 @@ import (
 	"gopkg.in/mgo.v2"
 
 	"github.com/reusee/catch"
+	"github.com/reusee/hcutil"
 )
 
 var (
@@ -17,6 +18,11 @@ var (
 	pt = fmt.Printf
 	sp = fmt.Sprintf
 )
+
+func init() {
+	hcutil.DefaultRetryCount = 1
+	hcutil.DefaultRetryInterval = time.Millisecond * 200
+}
 
 func main() {
 	// database
