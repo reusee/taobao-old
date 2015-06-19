@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"time"
 
 	"gopkg.in/mgo.v2"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/reusee/catch"
 	"github.com/reusee/hcutil"
@@ -22,6 +24,8 @@ var (
 func init() {
 	hcutil.DefaultRetryCount = 1
 	hcutil.DefaultRetryInterval = time.Millisecond * 200
+
+	go http.ListenAndServe("127.0.0.1:9991", nil)
 }
 
 func main() {
@@ -40,7 +44,7 @@ func main() {
 	case "stats":
 		stats(db, date)
 	case "cats":
-		collectCategories(db, http.DefaultClient)
+		collectCategories(db)
 	case "foo":
 		foo(db, date)
 	}
