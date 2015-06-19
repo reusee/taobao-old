@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -12,38 +13,38 @@ import (
 )
 
 type Cat struct {
-	Cat  int
-	Name string
-	Subs []Cat
+	Cat       int
+	Name      string
+	Relatives []int
 }
 
 func collectCategories(db *mgo.Database) {
-	collected := make(map[string]bool)
-	var collectCategory func(cat, name string) Cat
-	collectCategory = func(cat, name string) (ret Cat) {
-		if collected[cat] {
-			panic(sp("loop %s %s", cat, name))
+	cats := make(map[int]Cat)
+	clientSet := NewClientSet()
+	var collectCategory func(Cat)
+	collectCategory = func(cat Cat) {
+		if _, ok := cats[cat.Cat]; ok {
+			return // skip
 		}
-		client := http.DefaultClient
-		if cat != "" {
-			id, err := strconv.Atoi(cat)
-			ce(err, sp("parse cat id %s", cat))
-			ret.Cat = id
-			ret.Name = name
-		}
-		for {
-			bs, err := hcutil.GetBytes(client, sp("http://s.taobao.com/list?cat=%s", cat))
+		pt("%10d %s\n", cat.Cat, cat.Name)
+		var relatives []Cat
+		clientSet.Do(func(client *http.Client) ClientState {
+			var catStr string
+			if cat.Cat != 0 {
+				catStr = strconv.Itoa(cat.Cat)
+			}
+			bs, err := hcutil.GetBytes(client, sp("http://s.taobao.com/list?cat=%s", catStr))
 			if err != nil {
-				continue
+				return Bad
 			}
 			jstr, err := GetPageConfigJson(bs)
 			if err != nil {
-				continue
+				return Bad
 			}
 			var config PageConfig
 			err = json.Unmarshal(jstr, &config)
 			if err != nil {
-				continue
+				return Bad
 			}
 			var nav struct {
 				Common []struct {
@@ -57,23 +58,39 @@ func collectCategories(db *mgo.Database) {
 			}
 			err = json.Unmarshal(config.Mods["nav"].Data, &nav)
 			if err != nil {
-				continue
+				return Bad
 			}
 			for _, e := range nav.Common {
 				if e.Text == "相关分类" {
 					for _, sub := range e.Sub {
-						pt("%s %s\n", sub.Text, sub.Value)
-						ret.Subs = append(ret.Subs, collectCategory(sub.Value, sub.Text))
+						id, err := strconv.Atoi(sub.Value)
+						ce(err, sp("parse cat id %s", sub.Value))
+						relatives = append(relatives, Cat{
+							Cat:  id,
+							Name: sub.Text,
+						})
+						cat.Relatives = append(cat.Relatives, id)
 					}
 				}
 			}
-			break
+			return Good
+		})
+		wg := new(sync.WaitGroup)
+		wg.Add(len(relatives))
+		for _, r := range relatives {
+			r := r
+			go func() {
+				defer wg.Done()
+				collectCategory(r)
+			}()
 		}
-		collected[cat] = true
-		return
+		wg.Wait()
+		if cat.Cat != 0 {
+			cats[cat.Cat] = cat
+		}
 	}
 
-	root := collectCategory("", "")
+	collectCategory(Cat{})
 
 	catsColle := db.C("cats")
 	err := catsColle.EnsureIndex(mgo.Index{
@@ -81,8 +98,10 @@ func collectCategories(db *mgo.Database) {
 		Unique: true,
 	})
 	ce(err, "ensure index")
-	for _, cat := range root.Subs {
+
+	for _, cat := range cats {
 		_, err = catsColle.Upsert(bson.M{"cat": cat.Cat}, cat)
 		ce(err, "upsert")
 	}
+
 }

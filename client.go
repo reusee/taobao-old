@@ -36,7 +36,6 @@ func NewClientSet() *ClientSet {
 		for _, addr := range proxies {
 			client, err := hcutil.NewClientSocks5("localhost:" + addr)
 			if err != nil {
-				pt("client %s bad: %v\n", addr, err)
 				continue
 			}
 			done := make(chan struct{})
@@ -49,7 +48,6 @@ func NewClientSet() *ClientSet {
 			select {
 			case <-time.After(time.Second * 4):
 			case <-done:
-				pt("client %s ok\n", addr)
 				in <- client
 			}
 		}
