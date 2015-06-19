@@ -40,7 +40,7 @@ func main() {
 	case "stats":
 		stats(db, date)
 	case "cats":
-		collectCategories(http.DefaultClient)
+		collectCategories(db, http.DefaultClient)
 	case "foo":
 		foo(db, date)
 	}
