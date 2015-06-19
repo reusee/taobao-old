@@ -35,6 +35,7 @@ func stats(db *mgo.Database, date string) {
 	var item Item
 	for iter.Next(&item) {
 		item.View_sales = strings.Replace(item.View_sales, "人收货", "", -1)
+		item.View_sales = strings.Replace(item.View_sales, "人付款", "", -1)
 		count, err := strconv.Atoi(item.View_sales)
 		ce(err, sp("parse count %s", item.View_sales))
 		price, err := strconv.ParseFloat(item.View_price, 64)
