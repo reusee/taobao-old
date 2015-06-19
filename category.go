@@ -19,6 +19,13 @@ type Cat struct {
 }
 
 func collectCategories(db *mgo.Database) {
+	catsColle := db.C("cats")
+	err := catsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"cat"},
+		Unique: true,
+	})
+	ce(err, "ensure index")
+
 	cats := make(map[int]Cat)
 	clientSet := NewClientSet()
 	var collectCategory func(Cat)
@@ -75,6 +82,12 @@ func collectCategories(db *mgo.Database) {
 			}
 			return Good
 		})
+		if cat.Cat != 0 {
+			cats[cat.Cat] = cat
+			_, err = catsColle.Upsert(bson.M{"cat": cat.Cat}, cat)
+			ce(err, "upsert")
+		}
+
 		wg := new(sync.WaitGroup)
 		wg.Add(len(relatives))
 		for _, r := range relatives {
@@ -85,23 +98,8 @@ func collectCategories(db *mgo.Database) {
 			}()
 		}
 		wg.Wait()
-		if cat.Cat != 0 {
-			cats[cat.Cat] = cat
-		}
 	}
 
 	collectCategory(Cat{})
-
-	catsColle := db.C("cats")
-	err := catsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat"},
-		Unique: true,
-	})
-	ce(err, "ensure index")
-
-	for _, cat := range cats {
-		_, err = catsColle.Upsert(bson.M{"cat": cat.Cat}, cat)
-		ce(err, "upsert")
-	}
 
 }
