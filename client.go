@@ -7,10 +7,16 @@ import (
 	"github.com/reusee/hcutil"
 )
 
-func ClientsProvider() (clientsIn, badClients chan<- *http.Client, clientsOut <-chan *http.Client, killClientsChan chan struct{}) {
-	clientsIn, clientsOut, killClientsChan = NewClientsChan()
+type ClientSet struct {
+	in   chan<- *http.Client
+	out  <-chan *http.Client
+	bad  chan<- *http.Client
+	kill chan struct{}
+}
+
+func NewClientSet() *ClientSet {
+	in, out, kill := NewClientsChan()
 	bad := make(chan *http.Client)
-	badClients = bad
 
 	// local ss proxies
 	go func() {
@@ -44,24 +50,54 @@ func ClientsProvider() (clientsIn, badClients chan<- *http.Client, clientsOut <-
 			case <-time.After(time.Second * 4):
 			case <-done:
 				pt("client %s ok\n", addr)
-				clientsIn <- client
+				in <- client
 			}
 		}
 	}()
 
 	// free proxies
-	go provideFreeProxyClients(clientsIn)
+	go provideFreeProxyClients(in)
 
 	// reborn
 	go func() {
 		logs := make(map[*http.Client]int)
 		for client := range bad {
 			if logs[client] < 3 {
-				clientsIn <- client
+				in <- client
 				logs[client]++
 			}
 		}
 	}()
 
-	return
+	return &ClientSet{
+		in:   in,
+		out:  out,
+		bad:  bad,
+		kill: kill,
+	}
+}
+
+type ClientState uint8
+
+const (
+	Good ClientState = iota
+	Bad
+)
+
+func (s *ClientSet) Do(fn func(client *http.Client) ClientState) {
+loop:
+	for {
+		client := <-s.out
+		switch fn(client) {
+		case Good:
+			s.in <- client
+			break loop
+		case Bad:
+			s.bad <- client
+		}
+	}
+}
+
+func (s *ClientSet) Close() {
+	close(s.kill)
 }

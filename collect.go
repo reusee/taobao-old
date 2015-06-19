@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -16,9 +17,9 @@ import (
 )
 
 func collect(db *mgo.Database, date string) {
-	// client provider
-	clientsIn, badClients, clientsOut, killClientsChan := ClientsProvider()
-	defer close(killClientsChan)
+	// client set
+	clientSet := NewClientSet()
+	defer clientSet.Close()
 
 	jobsColle := db.C("jobs_" + date)
 	err := jobsColle.Create(&mgo.CollectionInfo{
@@ -126,7 +127,6 @@ collect:
 	jobsDone = 0
 	sem := make(chan struct{}, 256)
 	for _, job := range jobs {
-		client := <-clientsOut
 		job := job
 		sem <- struct{}{}
 		go func() {
@@ -136,87 +136,82 @@ collect:
 				<-sem
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
-			bs, err := hcutil.GetBytes(client, url)
-			if err != nil {
-				pt(sp("get %s error: %v\n", url, err))
-				badClients <- client
-				return
-			}
-			jstr, err := GetPageConfigJson(bs)
-			if err != nil {
-				pt(sp("get %s page config error: %v\n", url, err))
-				badClients <- client
-				return
-			}
-			var config PageConfig
-			err = json.Unmarshal(jstr, &config)
-			if err != nil {
-				pt(sp("unmarshal %s json error: %v\n", url, err))
-				badClients <- client
-				return
-			}
-			if config.Mods["itemlist"].Status == "hide" { // no items
-				markDone(job.Cat, job.Page)
-				clientsIn <- client
-				return
-			}
-			items, err := GetItems(config.Mods["itemlist"].Data)
-			if err != nil {
-				pt(sp("unmarshal item list %s error: %v\n", url, err))
-				badClients <- client
-				return
-			}
-			for _, item := range items {
-				err = itemsColle.Insert(item)
-				ce(allowDup(err), "insert item")
-				err = itemsColle.Update(bson.M{
-					"nid": item.Nid,
-				}, bson.M{
-					"$addToSet": bson.M{
-						"sources": Source{
-							Cat:  job.Cat,
-							Page: job.Page,
+			clientSet.Do(func(client *http.Client) ClientState {
+				bs, err := hcutil.GetBytes(client, url)
+				if err != nil {
+					pt(sp("get %s error: %v\n", url, err))
+					return Bad
+				}
+				jstr, err := GetPageConfigJson(bs)
+				if err != nil {
+					pt(sp("get %s page config error: %v\n", url, err))
+					return Bad
+				}
+				var config PageConfig
+				err = json.Unmarshal(jstr, &config)
+				if err != nil {
+					pt(sp("unmarshal %s json error: %v\n", url, err))
+					return Bad
+				}
+				if config.Mods["itemlist"].Status == "hide" { // no items
+					markDone(job.Cat, job.Page)
+					return Good
+				}
+				items, err := GetItems(config.Mods["itemlist"].Data)
+				if err != nil {
+					pt(sp("unmarshal item list %s error: %v\n", url, err))
+					return Bad
+				}
+				for _, item := range items {
+					err = itemsColle.Insert(item)
+					ce(allowDup(err), "insert item")
+					err = itemsColle.Update(bson.M{
+						"nid": item.Nid,
+					}, bson.M{
+						"$addToSet": bson.M{
+							"sources": Source{
+								Cat:  job.Cat,
+								Page: job.Page,
+							},
 						},
-					},
+					})
+					ce(err, "add source to item")
+				}
+				err = rawsColle.Insert(Raw{
+					Cat:   job.Cat,
+					Page:  job.Page,
+					Items: items,
+					Html:  bs,
 				})
-				ce(err, "add source to item")
-			}
-			err = rawsColle.Insert(Raw{
-				Cat:   job.Cat,
-				Page:  job.Page,
-				Items: items,
-				Html:  bs,
-			})
-			ce(err, "insert raw")
-			atomic.AddUint64(&itemsCount, uint64(len(items)))
-			if config.Mods["pager"].Status == "hide" || job.Page > 0 {
+				ce(err, "insert raw")
+				atomic.AddUint64(&itemsCount, uint64(len(items)))
+				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
+					markDone(job.Cat, job.Page)
+					return Good
+				}
+				var pagerData struct {
+					TotalPage int
+				}
+				err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
+				if err != nil {
+					pt(sp("unmarshal pager %s error: %v\n", url, err))
+					return Bad
+				}
+				maxPage := 10
+				if pagerData.TotalPage < maxPage {
+					maxPage = pagerData.TotalPage
+				}
+				for i := 1; i < maxPage; i++ {
+					err = jobsColle.Insert(Job{
+						Cat:  job.Cat,
+						Page: i,
+						Done: false,
+					})
+					ce(allowDup(err), "insert job")
+				}
 				markDone(job.Cat, job.Page)
-				clientsIn <- client
-				return
-			}
-			var pagerData struct {
-				TotalPage int
-			}
-			err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
-			if err != nil {
-				pt(sp("unmarshal pager %s error: %v\n", url, err))
-				badClients <- client
-				return
-			}
-			maxPage := 10
-			if pagerData.TotalPage < maxPage {
-				maxPage = pagerData.TotalPage
-			}
-			for i := 1; i < maxPage; i++ {
-				err = jobsColle.Insert(Job{
-					Cat:  job.Cat,
-					Page: i,
-					Done: false,
-				})
-				ce(allowDup(err), "insert job")
-			}
-			markDone(job.Cat, job.Page)
-			clientsIn <- client
+				return Good
+			})
 		}()
 	}
 	wg.Wait()
