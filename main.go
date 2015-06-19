@@ -5,8 +5,6 @@ import (
 	"os"
 	"time"
 
-	"gopkg.in/mgo.v2"
-
 	"net/http"
 	_ "net/http/pprof"
 
@@ -29,25 +27,27 @@ func init() {
 }
 
 func main() {
-	// database
-	session, err := mgo.Dial("127.0.0.1")
-	ce(err, "connect to db")
-	defer session.Close()
-	db := session.DB("taobao")
-
-	now := time.Now()
-	date := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
+	backend, err := NewMongo()
+	ce(err, "new backend")
+	defer backend.Close()
 
 	switch os.Args[1] {
 	case "collect":
-		collect(db, date)
+		collect(backend)
 	case "stats":
-		stats(db, date)
+		//stats(backend) TODO
 	case "cats":
-		collectCategories(db)
+		//collectCategories(backend) TODO
 	case "foo":
-		foo(db, date)
+		//foo(backend) TODO
 	}
+}
+
+type Backend interface {
+	AddJob(Job) error
+	DoneJob(Job) error
+	GetJobs() ([]Job, error)
+	AddItem(Item, Job) error
 }
 
 type Item struct {
@@ -94,4 +94,9 @@ type Raw struct {
 
 type Source struct {
 	Cat, Page int
+}
+
+type Job struct {
+	Cat, Page int
+	Done      bool
 }

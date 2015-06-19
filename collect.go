@@ -12,39 +12,12 @@ import (
 	"time"
 
 	"github.com/reusee/hcutil"
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
 )
 
-func collect(db *mgo.Database, date string) {
+func collect(backend Backend) {
 	// client set
 	clientSet := NewClientSet()
 	defer clientSet.Close()
-
-	jobsColle := db.C("jobs_" + date)
-	err := jobsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		},
-	})
-	ce(ignoreExistsColle(err), "create jobs collection")
-	err = jobsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat", "page"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure jobs collection index")
-	err = jobsColle.EnsureIndexKey("done")
-	ce(err, "ensure jobs collection done key")
-	err = jobsColle.EnsureIndexKey("cat")
-	ce(err, "ensure jobs collection cat key")
-	err = jobsColle.EnsureIndexKey("page")
-	ce(err, "ensure jobs collection page key")
-
-	type Job struct {
-		Cat, Page int
-		Done      bool
-	}
 
 	// first-page jobs
 	content, err := ioutil.ReadFile("categories")
@@ -57,7 +30,7 @@ func collect(db *mgo.Database, date string) {
 		catStr := line[bytes.LastIndex(line, []byte(" "))+1:]
 		cat, err := strconv.Atoi(string(catStr))
 		ce(err, "parse cat id")
-		err = jobsColle.Insert(Job{
+		err = backend.AddJob(Job{
 			Cat:  cat,
 			Page: 0,
 			Done: false,
@@ -66,36 +39,8 @@ func collect(db *mgo.Database, date string) {
 	}
 	pt("first-page jobs inserted\n")
 
-	itemsColle := db.C("items_" + date)
-	err = itemsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		}})
-	ce(ignoreExistsColle(err), "create items collection")
-	err = itemsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"nid"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure items collection index")
-
-	rawsColle := db.C("raws_" + date)
-	err = rawsColle.Create(&mgo.CollectionInfo{
-		Extra: bson.M{
-			"compression": "zlib",
-		},
-	})
-	ce(ignoreExistsColle(err), "create raws collection")
-	err = rawsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat", "page"},
-		Unique: true,
-		Sparse: true,
-	})
-	ce(err, "ensure raws index")
-
-	markDone := func(cat, page int) {
-		err := jobsColle.Update(bson.M{"cat": cat, "page": page},
-			bson.M{"$set": bson.M{"done": true}})
+	markDone := func(job Job) {
+		err := backend.DoneJob(job)
 		ce(err, "mark done")
 	}
 
@@ -114,8 +59,7 @@ func collect(db *mgo.Database, date string) {
 
 	// collect
 collect:
-	jobs := []Job{}
-	err = jobsColle.Find(bson.M{"done": false}).All(&jobs)
+	jobs, err := backend.GetJobs()
 	ce(err, "get jobs")
 	pt("%d jobs\n", len(jobs))
 	if len(jobs) == 0 {
@@ -154,7 +98,7 @@ collect:
 					return Bad
 				}
 				if config.Mods["itemlist"].Status == "hide" { // no items
-					markDone(job.Cat, job.Page)
+					markDone(job)
 					return Good
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
@@ -163,30 +107,12 @@ collect:
 					return Bad
 				}
 				for _, item := range items {
-					err = itemsColle.Insert(item)
-					ce(allowDup(err), "insert item")
-					err = itemsColle.Update(bson.M{
-						"nid": item.Nid,
-					}, bson.M{
-						"$addToSet": bson.M{
-							"sources": Source{
-								Cat:  job.Cat,
-								Page: job.Page,
-							},
-						},
-					})
-					ce(err, "add source to item")
+					err = backend.AddItem(item, job)
+					ce(err, "add item")
 				}
-				err = rawsColle.Insert(Raw{
-					Cat:   job.Cat,
-					Page:  job.Page,
-					Items: items,
-					Html:  bs,
-				})
-				ce(err, "insert raw")
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
-					markDone(job.Cat, job.Page)
+					markDone(job)
 					return Good
 				}
 				var pagerData struct {
@@ -197,19 +123,19 @@ collect:
 					pt(sp("unmarshal pager %s error: %v\n", url, err))
 					return Bad
 				}
-				maxPage := 10
+				maxPage := 20
 				if pagerData.TotalPage < maxPage {
 					maxPage = pagerData.TotalPage
 				}
 				for i := 1; i < maxPage; i++ {
-					err = jobsColle.Insert(Job{
+					err = backend.AddJob(Job{
 						Cat:  job.Cat,
 						Page: i,
 						Done: false,
 					})
-					ce(allowDup(err), "insert job")
+					ce(err, "insert job")
 				}
-				markDone(job.Cat, job.Page)
+				markDone(job)
 				return Good
 			})
 		}()
