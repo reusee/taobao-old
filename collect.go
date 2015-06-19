@@ -169,14 +169,6 @@ collect:
 					"nid": item.Nid,
 				}, bson.M{
 					"$addToSet": bson.M{
-						"cats": job.Cat,
-					},
-				})
-				ce(err, "add cat to item")
-				err = itemsColle.Update(bson.M{
-					"nid": item.Nid,
-				}, bson.M{
-					"$addToSet": bson.M{
 						"sources": Source{
 							Cat:  job.Cat,
 							Page: job.Page,

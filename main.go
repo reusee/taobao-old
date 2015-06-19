@@ -41,7 +41,6 @@ func main() {
 }
 
 type Item struct {
-	Cats    []int
 	Sources []Source
 
 	//I2iTags       map[string]interface{}
