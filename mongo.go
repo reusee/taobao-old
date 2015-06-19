@@ -10,7 +10,9 @@ import (
 type Mongo struct {
 	session                          *mgo.Session
 	db                               *mgo.Database
+	date                             string
 	jobsColle, itemsColle, rawsColle *mgo.Collection
+	catsColle                        *mgo.Collection
 }
 
 func NewMongo() (m *Mongo, err error) {
@@ -71,12 +73,21 @@ func NewMongo() (m *Mongo, err error) {
 	})
 	ce(err, "ensure raws index")
 
+	catsColle := db.C("cats")
+	err = catsColle.EnsureIndex(mgo.Index{
+		Key:    []string{"cat"},
+		Unique: true,
+	})
+	ce(err, "ensure index")
+
 	return &Mongo{
 		session:    session,
 		db:         db,
+		date:       date,
 		jobsColle:  jobsColle,
 		itemsColle: itemsColle,
 		rawsColle:  rawsColle,
+		catsColle:  catsColle,
 	}, nil
 }
 
@@ -114,4 +125,9 @@ func (m *Mongo) AddItem(item Item, job Job) (err error) {
 	})
 	ce(err, "add source to item")
 	return
+}
+
+func (m *Mongo) AddCat(cat Cat) error {
+	_, err := m.catsColle.Upsert(bson.M{"cat": cat.Cat}, cat)
+	return err
 }

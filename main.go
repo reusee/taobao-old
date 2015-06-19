@@ -35,11 +35,11 @@ func main() {
 	case "collect":
 		collect(backend)
 	case "stats":
-		//stats(backend) TODO
+		backend.Stats()
 	case "cats":
-		//collectCategories(backend) TODO
+		collectCategories(backend)
 	case "foo":
-		//foo(backend) TODO
+		backend.Foo()
 	}
 }
 
@@ -48,6 +48,10 @@ type Backend interface {
 	DoneJob(Job) error
 	GetJobs() ([]Job, error)
 	AddItem(Item, Job) error
+	AddCat(Cat) error
+
+	Stats()
+	Foo()
 }
 
 type Item struct {
@@ -99,4 +103,10 @@ type Source struct {
 type Job struct {
 	Cat, Page int
 	Done      bool
+}
+
+type Cat struct {
+	Cat       int
+	Name      string
+	Relatives []int
 }

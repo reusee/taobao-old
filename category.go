@@ -6,26 +6,10 @@ import (
 	"strconv"
 	"sync"
 
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
-
 	"github.com/reusee/hcutil"
 )
 
-type Cat struct {
-	Cat       int
-	Name      string
-	Relatives []int
-}
-
-func collectCategories(db *mgo.Database) {
-	catsColle := db.C("cats")
-	err := catsColle.EnsureIndex(mgo.Index{
-		Key:    []string{"cat"},
-		Unique: true,
-	})
-	ce(err, "ensure index")
-
+func collectCategories(backend Backend) {
 	cats := make(map[int]Cat)
 	clientSet := NewClientSet()
 	var collectCategory func(Cat)
@@ -84,8 +68,7 @@ func collectCategories(db *mgo.Database) {
 		})
 		if cat.Cat != 0 {
 			cats[cat.Cat] = cat
-			_, err = catsColle.Upsert(bson.M{"cat": cat.Cat}, cat)
-			ce(err, "upsert")
+			ce(backend.AddCat(cat), "add cat")
 		}
 
 		wg := new(sync.WaitGroup)

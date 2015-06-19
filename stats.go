@@ -8,10 +8,10 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func stats(db *mgo.Database, date string) {
-	itemsColle := db.C("items_" + date)
+func (m *Mongo) Stats() {
+	itemsColle := m.db.C("items_" + m.date)
 
-	catStatsColle := db.C("cat_stats_" + date)
+	catStatsColle := m.db.C("cat_stats_" + m.date)
 	err := catStatsColle.Create(&mgo.CollectionInfo{
 		Extra: bson.M{
 			"compression": "zlib",

@@ -4,14 +4,13 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
-func foo(db *mgo.Database, date string) {
+func (m *Mongo) Foo() {
 
 	/*
-		itemsColle := db.C("items_" + date)
+		itemsColle := m.db.C("items_" + m.date)
 		query := itemsColle.Find(nil)
 		iter := query.Iter()
 		var item Item
@@ -24,7 +23,7 @@ func foo(db *mgo.Database, date string) {
 		}
 	*/
 
-	rawsColle := db.C("raws_" + date)
+	rawsColle := m.db.C("raws_" + m.date)
 	query := rawsColle.Find(bson.M{"cat": 50390004})
 	iter := query.Iter()
 	var raw Raw
