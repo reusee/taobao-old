@@ -27,7 +27,6 @@ func provideFreeProxyClients(clients chan<- *http.Client) {
 				Transport: &http.Transport{
 					Proxy: http.ProxyURL(proxyUrl),
 				},
-				Timeout: time.Second * 8,
 			}
 			/*
 				if testClient(client, addr) {
@@ -61,7 +60,6 @@ func provideFreeProxyClients(clients chan<- *http.Client) {
 					Transport: &http.Transport{
 						Proxy: http.ProxyURL(proxyUrl),
 					},
-					Timeout: time.Second * 8,
 				}
 				if testClient(client, addr) {
 					clients <- client

@@ -33,7 +33,6 @@ func ClientsProvider() (clientsIn, badClients chan<- *http.Client, clientsOut <-
 				pt("client %s bad: %v\n", addr, err)
 				continue
 			}
-			client.Timeout = time.Second * 8
 			done := make(chan struct{})
 			go func() {
 				_, err = hcutil.GetBytes(client, "http://www.taobao.com")
