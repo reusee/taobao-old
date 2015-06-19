@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"strconv"
+	"strings"
 
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
@@ -25,24 +25,22 @@ func foo(db *mgo.Database, date string) {
 	*/
 
 	rawsColle := db.C("raws_" + date)
-	query := rawsColle.Find(bson.M{"cat": 50992010})
+	query := rawsColle.Find(bson.M{"cat": 50390004})
 	iter := query.Iter()
 	var raw Raw
+	n := 0
 	for iter.Next(&raw) {
-		here := false
 		for _, item := range raw.Items {
-			if item.Nid == "39470054563" {
-				here = true
-			}
+			pt("%s\n", item.Title)
+			pt("%s\n", item.View_sales)
+			pt("%s\n", item.View_price)
+			item.View_sales = strings.Replace(item.View_sales, "人收货", "", -1)
+			count, err := strconv.Atoi(item.View_sales)
+			ce(err, sp("parse count %s", item.View_sales))
+			n += count
 		}
-		if here {
-			pt("%d %d\n", raw.Page, raw.Cat)
-			for _, item := range raw.Items {
-				buf := new(bytes.Buffer)
-				json.NewEncoder(buf).Encode(item)
-				pt("%s\n", buf.Bytes())
-			}
-		}
+		pt("\n")
 	}
+	pt("%d\n", n)
 
 }
