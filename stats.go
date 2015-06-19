@@ -9,6 +9,7 @@ import (
 )
 
 func stats(db *mgo.Database, date string) {
+	date = "20150618"
 	itemsColle := db.C("items_" + date)
 
 	catStatsColle := db.C("cat_stats_" + date)
@@ -40,13 +41,8 @@ func stats(db *mgo.Database, date string) {
 		price, err := strconv.ParseFloat(item.View_price, 64)
 		ce(err, sp("parse price %s", item.View_price))
 		amount := price * float64(count)
-		/*
-			if amount > 10000000 {
-				pt("%s\n%d %f\n", item.Title, count, price)
-				pt("http://item.taobao.com/item.htm?id=%s\n", item.Nid)
-			}
-		*/
-		for _, cat := range item.Cats {
+		for _, src := range item.Sources {
+			cat := src.Cat
 			if _, ok := catStats[cat]; !ok {
 				catStats[cat] = &CatStat{
 					Cat: cat,
