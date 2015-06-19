@@ -38,6 +38,7 @@ func NewClientSet() *ClientSet {
 			if err != nil {
 				continue
 			}
+			client.Timeout = time.Second * 32
 			done := make(chan struct{})
 			go func() {
 				_, err = hcutil.GetBytes(client, "http://www.taobao.com")
