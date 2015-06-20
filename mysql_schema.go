@@ -50,9 +50,9 @@ func (m *Mysql) checkSchema() (err error) {
 		INDEX (nid),
 		INDEX (price),
 		INDEX (sales),
-		INDEX (comments),
+		INDEX (comments)
 	) ENGINE = TokuDB`)
-	ce(err, "create table item_prices")
+	ce(err, "create table item_stats")
 
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_sources (
 		date DATE,
