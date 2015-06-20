@@ -74,7 +74,7 @@ collect:
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := hcutil.GetBytes(client, url)
 				if err != nil {
-					pt(sp("get %s error: %v\n", url, err))
+					//pt(sp("get %s error: %v\n", url, err))
 					return Bad
 				}
 				jstr, err := GetPageConfigJson(bs)
@@ -85,7 +85,7 @@ collect:
 				var config PageConfig
 				err = json.Unmarshal(jstr, &config)
 				if err != nil {
-					pt(sp("unmarshal %s json error: %v\n", url, err))
+					//pt(sp("unmarshal %s json error: %v\n", url, err))
 					return Bad
 				}
 				if config.Mods["itemlist"].Status == "hide" { // no items
@@ -94,7 +94,7 @@ collect:
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
 				if err != nil {
-					pt(sp("unmarshal item list %s error: %v\n", url, err))
+					//pt(sp("unmarshal item list %s error: %v\n", url, err))
 					return Bad
 				}
 				ce(backend.AddItems(items, job), "add items")
@@ -108,7 +108,7 @@ collect:
 				}
 				err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
 				if err != nil {
-					pt(sp("unmarshal pager %s error: %v\n", url, err))
+					//pt(sp("unmarshal pager %s error: %v\n", url, err))
 					return Bad
 				}
 				maxPage := 20
