@@ -35,7 +35,7 @@ func collect(backend Backend) {
 			Page: 0,
 			Done: false,
 		})
-		ce(allowDup(err), "insert job")
+		ce(err, "insert job")
 	}
 	pt("first-page jobs inserted\n")
 

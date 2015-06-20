@@ -27,9 +27,12 @@ func init() {
 }
 
 func main() {
-	backend, err := NewMongo()
-	ce(err, "new backend")
-	defer backend.Close()
+	/*
+		backend, err := NewMongo()
+		ce(err, "new backend")
+		defer backend.Close()
+	*/
+	var backend Backend
 
 	switch os.Args[1] {
 	case "collect":
