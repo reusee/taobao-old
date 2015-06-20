@@ -38,8 +38,6 @@ func main() {
 		backend.Stats()
 	case "cats":
 		collectCategories(backend)
-	case "foo":
-		backend.Foo()
 	}
 }
 
@@ -51,7 +49,6 @@ type Backend interface {
 	AddCat(Cat) error
 
 	Stats()
-	Foo()
 }
 
 type Item struct {
