@@ -48,10 +48,10 @@ func main() {
 }
 
 type Backend interface {
-	AddJob(Job) error
+	AddJobs([]Job) error
 	DoneJob(Job) error
 	GetJobs() ([]Job, error)
-	AddItem(Item, Job) error
+	AddItems([]Item, Job) error
 	AddCat(Cat) error
 
 	Stats()

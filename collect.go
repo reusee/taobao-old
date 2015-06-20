@@ -23,6 +23,7 @@ func collect(backend Backend) {
 	content, err := ioutil.ReadFile("categories")
 	ce(err, "read categories file")
 	pt("start insert first-page jobs\n")
+	jobs := []Job{}
 	for _, line := range bytes.Split(content, []byte("\n")) {
 		if len(line) == 0 {
 			continue
@@ -30,13 +31,13 @@ func collect(backend Backend) {
 		catStr := line[bytes.LastIndex(line, []byte(" "))+1:]
 		cat, err := strconv.Atoi(string(catStr))
 		ce(err, "parse cat id")
-		err = backend.AddJob(Job{
+		jobs = append(jobs, Job{
 			Cat:  cat,
 			Page: 0,
 			Done: false,
 		})
-		ce(err, "insert job")
 	}
+	ce(backend.AddJobs(jobs), "add jobs")
 	pt("first-page jobs inserted\n")
 
 	markDone := func(job Job) {
@@ -59,7 +60,7 @@ func collect(backend Backend) {
 
 	// collect
 collect:
-	jobs, err := backend.GetJobs()
+	jobs, err = backend.GetJobs()
 	ce(err, "get jobs")
 	pt("%d jobs\n", len(jobs))
 	if len(jobs) == 0 {
@@ -106,10 +107,7 @@ collect:
 					pt(sp("unmarshal item list %s error: %v\n", url, err))
 					return Bad
 				}
-				for _, item := range items {
-					err = backend.AddItem(item, job)
-					ce(err, "add item")
-				}
+				ce(backend.AddItems(items, job), "add items")
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 					markDone(job)
@@ -127,14 +125,15 @@ collect:
 				if pagerData.TotalPage < maxPage {
 					maxPage = pagerData.TotalPage
 				}
+				js := []Job{}
 				for i := 1; i < maxPage; i++ {
-					err = backend.AddJob(Job{
+					js = append(js, Job{
 						Cat:  job.Cat,
 						Page: i,
 						Done: false,
 					})
-					ce(err, "insert job")
 				}
+				ce(backend.AddJobs(js), "add jobs")
 				markDone(job)
 				return Good
 			})
