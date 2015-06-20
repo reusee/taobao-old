@@ -32,7 +32,10 @@ func main() {
 		ce(err, "new backend")
 		defer backend.Close()
 	*/
-	var backend Backend
+
+	backend, err := NewMysql()
+	ce(err, "new backend")
+	defer backend.Close()
 
 	switch os.Args[1] {
 	case "collect":
