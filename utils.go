@@ -4,8 +4,6 @@ import (
 	"net/url"
 	"sort"
 
-	"gopkg.in/mgo.v2"
-
 	"github.com/PuerkitoBio/goquery"
 )
 
@@ -26,22 +24,4 @@ func dumpUrl(rawUrl string) {
 func dumpDoc(doc *goquery.Document) {
 	html, _ := doc.Html()
 	pt("%s\n", html)
-}
-
-func ignoreExistsColle(err error) error {
-	if err, ok := err.(*mgo.QueryError); ok {
-		if err.Message == "collection already exists" {
-			return nil
-		}
-	}
-	return err
-}
-
-func allowDup(err error) error {
-	if err, ok := err.(*mgo.LastError); ok {
-		if err.Code == 11000 {
-			return nil
-		}
-	}
-	return err
 }

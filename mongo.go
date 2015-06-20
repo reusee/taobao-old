@@ -131,3 +131,21 @@ func (m *Mongo) AddCat(cat Cat) error {
 	_, err := m.catsColle.Upsert(bson.M{"cat": cat.Cat}, cat)
 	return err
 }
+
+func ignoreExistsColle(err error) error {
+	if err, ok := err.(*mgo.QueryError); ok {
+		if err.Message == "collection already exists" {
+			return nil
+		}
+	}
+	return err
+}
+
+func allowDup(err error) error {
+	if err, ok := err.(*mgo.LastError); ok {
+		if err.Code == 11000 {
+			return nil
+		}
+	}
+	return err
+}
