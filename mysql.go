@@ -81,8 +81,19 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 	return
 }
 
-func (m *Mysql) AddCat(cat Cat) error {
-	return nil //TODO
+func (m *Mysql) AddCat(cat Cat) (err error) {
+	tx, err := m.db.Begin()
+	ce(err, "start transaction")
+	_, err = tx.Exec(`INSERT IGNORE INTO cats (cat, name) VALUES (?, ?)`,
+		cat.Cat, cat.Name)
+	ce(err, "insert")
+	for _, rel := range cat.Relatives {
+		_, err = tx.Exec(`INSERT IGNORE INTO cat_relatives (cat, rel) VALUES (?, ?)`,
+			cat.Cat, rel)
+		ce(err, "insert")
+	}
+	ce(tx.Commit(), "commit")
+	return
 }
 
 func (m *Mysql) Stats() {
