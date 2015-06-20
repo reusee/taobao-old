@@ -4,24 +4,70 @@ func (m *Mysql) checkSchema() (err error) {
 	defer ct(&err)
 
 	_, err = m.db.Exec(sp(`CREATE TABLE IF NOT EXISTS jobs_%s (
-		cat BIGINT,
+		cat BIGINT REFERENCES cats(cat),
 		page SMALLINT,
 		done BOOL NOT NULL DEFAULT false,
 		PRIMARY KEY (cat, page)
 	) ENGINE = TokuDB`, m.date))
-	ce(err, "create table")
+	ce(err, "create table jobs")
 
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cats (
 		cat BIGINT PRIMARY KEY,
 		name TEXT
 	) ENGINE = TokuDB`)
-	ce(err, "create table")
+	ce(err, "create table cats")
 
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cat_relatives (
-		cat BIGINT,
-		rel BIGINT,
+		cat BIGINT REFERENCES cats(cat),
+		rel BIGINT REFERENCES cats(cat),
 		PRIMARY KEY (cat, rel)
 	) ENGINE = TokuDB`)
+	ce(err, "create table cat_relatives")
+
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS items (
+		nid BIGINT PRIMARY KEY,
+		title TEXT,
+		raw_title TEXT,
+		pic_url TEXT,
+		detail_url TEXT,
+		comment_url TEXT,
+		location TEXT,
+		seller BIGINT REFERENCES users(id),
+		shop CHAR(32) REFERENCES shops(id)
+	) ENGINE = TokuDB`)
+	ce(err, "create table items")
+
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_stats (
+		date DATE,
+		nid BIGINT REFERENCES items(nid),
+		price DECIMAL(12, 2),
+		sales BIGINT,
+		comments BIGINT,
+		PRIMARY KEY (date, nid)
+	) ENGINE = TokuDB`)
+	ce(err, "create table item_prices")
+
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_sources (
+		date DATE,
+		nid BIGINT REFERENCES items(nid),
+		cat BIGINT REFERENCES cats(cat),
+		page SMALLINT,
+		PRIMARY KEY (date, nid, cat, page)
+	) ENGINE = TokuDB`)
+	ce(err, "create table item_sources")
+
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS users (
+		id BIGINT PRIMARY KEY,
+		name TEXT
+	) ENGINE = TokuDB`)
+	ce(err, "create table users")
+
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS shops (
+		id CHAR(32) PRIMARY KEY,
+		is_tmall BOOL,
+		level SMALLINT
+	) ENGINE = TokuDB`)
+	ce(err, "create table shops")
 
 	return nil
 }

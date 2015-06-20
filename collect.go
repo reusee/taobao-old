@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,25 +18,17 @@ func collect(backend Backend) {
 	defer clientSet.Close()
 
 	// first-page jobs
-	content, err := ioutil.ReadFile("categories")
-	ce(err, "read categories file")
-	pt("start insert first-page jobs\n")
 	jobs := []Job{}
-	for _, line := range bytes.Split(content, []byte("\n")) {
-		if len(line) == 0 {
-			continue
-		}
-		catStr := line[bytes.LastIndex(line, []byte(" "))+1:]
-		cat, err := strconv.Atoi(string(catStr))
-		ce(err, "parse cat id")
+	cats, err := backend.GetCats()
+	ce(err, "get cats")
+	for _, cat := range cats {
 		jobs = append(jobs, Job{
-			Cat:  cat,
+			Cat:  cat.Cat,
 			Page: 0,
 			Done: false,
 		})
 	}
 	ce(backend.AddJobs(jobs), "add jobs")
-	pt("first-page jobs inserted\n")
 
 	markDone := func(job Job) {
 		err := backend.DoneJob(job)
@@ -89,7 +79,7 @@ collect:
 				}
 				jstr, err := GetPageConfigJson(bs)
 				if err != nil {
-					pt(sp("get %s page config error: %v\n", url, err))
+					//pt(sp("get %s page config error: %v\n", url, err))
 					return Bad
 				}
 				var config PageConfig

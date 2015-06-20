@@ -53,6 +53,7 @@ type Backend interface {
 	GetJobs() ([]Job, error)
 	AddItems([]Item, Job) error
 	AddCat(Cat) error
+	GetCats() ([]Cat, error)
 
 	Stats()
 }
