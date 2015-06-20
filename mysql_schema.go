@@ -20,7 +20,8 @@ func (m *Mysql) checkSchema() (err error) {
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cat_relatives (
 		cat BIGINT REFERENCES cats(cat),
 		rel BIGINT REFERENCES cats(cat),
-		PRIMARY KEY (cat, rel)
+		PRIMARY KEY (cat, rel),
+		INDEX (rel)
 	) ENGINE = TokuDB`)
 	ce(err, "create table cat_relatives")
 
@@ -33,7 +34,9 @@ func (m *Mysql) checkSchema() (err error) {
 		comment_url TEXT,
 		location TEXT,
 		seller BIGINT REFERENCES users(id),
-		shop CHAR(32) REFERENCES shops(id)
+		shop CHAR(32) REFERENCES shops(id),
+		INDEX (seller),
+		INDEX (shop)
 	) ENGINE = TokuDB`)
 	ce(err, "create table items")
 
@@ -43,7 +46,11 @@ func (m *Mysql) checkSchema() (err error) {
 		price DECIMAL(12, 2),
 		sales BIGINT,
 		comments BIGINT,
-		PRIMARY KEY (date, nid)
+		PRIMARY KEY (date, nid),
+		INDEX (nid),
+		INDEX (price),
+		INDEX (sales),
+		INDEX (comments),
 	) ENGINE = TokuDB`)
 	ce(err, "create table item_prices")
 
@@ -52,7 +59,9 @@ func (m *Mysql) checkSchema() (err error) {
 		nid BIGINT REFERENCES items(nid),
 		cat BIGINT REFERENCES cats(cat),
 		page SMALLINT,
-		PRIMARY KEY (date, nid, cat, page)
+		PRIMARY KEY (date, nid, cat, page),
+		INDEX (nid),
+		INDEX (cat)
 	) ENGINE = TokuDB`)
 	ce(err, "create table item_sources")
 
@@ -65,7 +74,9 @@ func (m *Mysql) checkSchema() (err error) {
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS shops (
 		id CHAR(32) PRIMARY KEY,
 		is_tmall BOOL,
-		level SMALLINT
+		level SMALLINT,
+		INDEX (is_tmall),
+		INDEX (level)
 	) ENGINE = TokuDB`)
 	ce(err, "create table shops")
 
