@@ -97,7 +97,11 @@ collect:
 					//pt(sp("unmarshal item list %s error: %v\n", url, err))
 					return Bad
 				}
-				ce(backend.AddItems(items, job), "add items")
+				for {
+					if backend.AddItems(items, job) == nil {
+						break
+					}
+				}
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 					markDone(job)

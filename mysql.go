@@ -77,22 +77,21 @@ func (m *Mysql) GetJobs() (jobs []Job, err error) {
 func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	for _, item := range items {
-		tx, err := m.db.Begin()
 		ce(err, "start transaction")
 		//user
 		uid, err := strconv.Atoi(item.User_id)
 		ce(err, sp("parse uid %s", item.User_id))
-		_, err = tx.Exec(`INSERT IGNORE users (id, name) VALUES (?, ?)`,
+		_, err = m.db.Exec(`INSERT IGNORE users (id, name) VALUES (?, ?)`,
 			uid, item.Nick)
 		ce(err, "insert user")
 		//shop
-		_, err = tx.Exec(`INSERT IGNORE shops (id, is_tmall) VALUES (?, ?)`,
+		_, err = m.db.Exec(`INSERT IGNORE shops (id, is_tmall) VALUES (?, ?)`,
 			item.Shopcard.EncryptedUserId, item.Shopcard.IsTmall)
 		ce(err, "insert shop")
 		//item
 		nid, err := strconv.Atoi(item.Nid)
 		ce(err, sp("parse nid %s", item.Nid))
-		_, err = tx.Exec(`INSERT IGNORE INTO items (
+		_, err = m.db.Exec(`INSERT IGNORE INTO items (
 			nid, title, raw_title, pic_url, detail_url, comment_url, 
 			location, seller, shop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			nid, item.Title, item.Raw_title, item.Pic_url, item.Detail_url, item.Comment_url,
@@ -111,15 +110,14 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 			comments, err = strconv.Atoi(item.Comment_count)
 		}
 		ce(err, sp("parse comment count %s", item.Comment_count))
-		_, err = tx.Exec(`INSERT IGNORE item_stats (
+		_, err = m.db.Exec(`INSERT IGNORE item_stats (
 			date, nid, price, sales, comments) VALUES (?, ?, ?, ?, ?)`,
 			m.date4mysql, nid, price, sales, comments)
 		ce(err, "insert item stats")
 		//item sources
-		_, err = tx.Exec(`INSERT IGNORE item_sources (date, nid, cat, page)
+		_, err = m.db.Exec(`INSERT IGNORE item_sources (date, nid, cat, page)
 			VALUES (?, ?, ?, ?)`, m.date4mysql, nid, job.Cat, job.Page)
 		ce(err, "insert item sources")
-		ce(tx.Commit(), "commit")
 	}
 	return
 }
