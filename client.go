@@ -12,13 +12,12 @@ import (
 type ClientSet struct {
 	in   chan<- *http.Client
 	out  <-chan *http.Client
-	bad  chan<- *http.Client
 	kill chan struct{}
+	good map[*http.Client]int
 }
 
 func NewClientSet() *ClientSet {
 	in, out, kill := NewClientsChan()
-	bad := make(chan *http.Client)
 
 	// local ss proxies
 	go func() {
@@ -48,22 +47,11 @@ func NewClientSet() *ClientSet {
 	// free proxies
 	go provideFreeProxyClients(in)
 
-	// reborn
-	go func() {
-		logs := make(map[*http.Client]int)
-		for client := range bad {
-			if logs[client] < 3 {
-				in <- client
-				logs[client]++
-			}
-		}
-	}()
-
 	return &ClientSet{
 		in:   in,
 		out:  out,
-		bad:  bad,
 		kill: kill,
+		good: make(map[*http.Client]int),
 	}
 }
 
@@ -78,12 +66,19 @@ func (s *ClientSet) Do(fn func(client *http.Client) ClientState) {
 loop:
 	for {
 		client := <-s.out
+		if _, ok := s.good[client]; !ok {
+			s.good[client] = 3
+		}
 		switch fn(client) {
 		case Good:
 			s.in <- client
+			s.good[client]++
 			break loop
 		case Bad:
-			s.bad <- client
+			if s.good[client] > 0 {
+				s.good[client]--
+				s.in <- client
+			}
 		}
 	}
 }
