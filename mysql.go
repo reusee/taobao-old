@@ -118,6 +118,9 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 		_, err = m.db.Exec(`INSERT INTO item_sources (date, nid, cat, page)
 			VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE date=date`, m.date4mysql, nid, job.Cat, job.Page)
 		ce(err, "insert item sources")
+		_, err = m.db.Exec(`INSERT INTO item_cats (nid, cat)
+			VALUES (?, ?) ON DUPLICATE KEY UPDATE nid=nid`, nid, job.Cat)
+		ce(err, "insert item cats")
 	}
 	return
 }

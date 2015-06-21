@@ -65,6 +65,14 @@ func (m *Mysql) checkSchema() (err error) {
 	) ENGINE = TokuDB`)
 	ce(err, "create table item_sources")
 
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_cats (
+		nid BIGINT REFERENCES items(nid),
+		cat BIGINT REFERENCES cats(cat),
+		PRIMARY KEY (nid, cat),
+		INDEX (cat)
+	) ENGINE = TokuDB`)
+	ce(err, "create table item_cats")
+
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		id BIGINT PRIMARY KEY,
 		name TEXT
