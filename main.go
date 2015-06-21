@@ -56,6 +56,8 @@ type Backend interface {
 	GetCats() ([]Cat, error)
 
 	Stats()
+
+	LogClient(ClientInfo, ClientState)
 }
 
 type Item struct {

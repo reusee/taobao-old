@@ -10,10 +10,16 @@ import (
 )
 
 type ClientSet struct {
-	in   chan<- *http.Client
-	out  <-chan *http.Client
-	kill chan struct{}
-	good map[*http.Client]int
+	in     chan<- *http.Client
+	out    <-chan *http.Client
+	kill   chan struct{}
+	good   map[*http.Client]int
+	Logger func(ClientInfo, ClientState)
+	infos  map[*http.Client]ClientInfo
+}
+
+type ClientInfo struct {
+	HttpProxyAddr string
 }
 
 func NewClientSet() *ClientSet {
@@ -44,15 +50,18 @@ func NewClientSet() *ClientSet {
 		}
 	}()
 
-	// free proxies
-	go provideFreeProxyClients(in)
-
-	return &ClientSet{
-		in:   in,
-		out:  out,
-		kill: kill,
-		good: make(map[*http.Client]int),
+	s := &ClientSet{
+		in:    in,
+		out:   out,
+		kill:  kill,
+		good:  make(map[*http.Client]int),
+		infos: make(map[*http.Client]ClientInfo),
 	}
+
+	// free proxies
+	go s.provideFreeProxyClients()
+
+	return s
 }
 
 type ClientState uint8
@@ -73,11 +82,17 @@ loop:
 		case Good:
 			s.in <- client
 			s.good[client]++
+			if s.Logger != nil {
+				s.Logger(s.infos[client], Good)
+			}
 			break loop
 		case Bad:
 			if s.good[client] > 0 {
 				s.good[client]--
 				s.in <- client
+			}
+			if s.Logger != nil {
+				s.Logger(s.infos[client], Bad)
 			}
 		}
 	}
@@ -87,7 +102,7 @@ func (s *ClientSet) Close() {
 	close(s.kill)
 }
 
-func provideFreeProxyClients(clients chan<- *http.Client) {
+func (s *ClientSet) provideFreeProxyClients() {
 	entryPattern := regexp.MustCompile(`<tr><b><td>[0-9]+</td><td>([0-9.]+)</td><td>([0-9]+)</td>`)
 	for page := 1; page <= 10; page++ {
 		pageUrl := sp("http://www.proxy.com.ru/list_%d.html", page)
@@ -107,8 +122,11 @@ func provideFreeProxyClients(clients chan<- *http.Client) {
 				},
 				Timeout: time.Second * 32,
 			}
-			time.Sleep(time.Millisecond * 300)
-			clients <- client
+			s.infos[client] = ClientInfo{
+				HttpProxyAddr: addr,
+			}
+			time.Sleep(time.Millisecond * 200)
+			s.in <- client
 		}
 	}
 

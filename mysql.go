@@ -164,3 +164,19 @@ func (m *Mysql) Stats() {
 	`, m.date4mysql, m.date4mysql)
 	ce(err, "update category sales")
 }
+
+func (m *Mysql) LogClient(info ClientInfo, state ClientState) {
+	if info.HttpProxyAddr == "" {
+		return
+	}
+	switch state {
+	case Good:
+		_, err := m.db.Exec(`INSERT INTO proxies (date, addr, good) VALUES
+		(?, ?, 1) ON DUPLICATE KEY UPDATE good=good+1`, m.date4mysql, info.HttpProxyAddr)
+		ce(err, "insert proxy log")
+	case Bad:
+		_, err := m.db.Exec(`INSERT INTO proxies (date, addr, bad) VALUES
+		(?, ?, 1) ON DUPLICATE KEY UPDATE bad=bad+1`, m.date4mysql, info.HttpProxyAddr)
+		ce(err, "insert proxy log")
+	}
+}

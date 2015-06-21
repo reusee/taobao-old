@@ -14,6 +14,7 @@ func collect(backend Backend) {
 	// client set
 	clientSet := NewClientSet()
 	defer clientSet.Close()
+	clientSet.Logger = backend.LogClient
 
 	// first-page jobs
 	jobs := []Job{}

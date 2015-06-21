@@ -98,5 +98,14 @@ func (m *Mysql) checkSchema() (err error) {
 	) ENGINE = TokuDB`)
 	ce(err, "create table cat_stats")
 
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS proxies (
+		date DATE,
+		addr CHAR(32),
+		good INTEGER DEFAULT 0,
+		bad INTEGER DEFAULT 0,
+		PRIMARY KEY (date, addr)
+	) ENGINE = TokuDB`)
+	ce(err, "create table proxies")
+
 	return nil
 }
