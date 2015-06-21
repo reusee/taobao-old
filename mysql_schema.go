@@ -88,5 +88,15 @@ func (m *Mysql) checkSchema() (err error) {
 	) ENGINE = TokuDB`)
 	ce(err, "create table shops")
 
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cat_stats (
+		date DATE,
+		cat BIGINT REFERENCES cats(cat),
+		sales BIGINT,
+		PRIMARY KEY (date, cat),
+		INDEX (cat),
+		INDEX (sales)
+	) ENGINE = TokuDB`)
+	ce(err, "create table cat_stats")
+
 	return nil
 }

@@ -154,5 +154,13 @@ func (m *Mysql) GetCats() (cats []Cat, err error) {
 }
 
 func (m *Mysql) Stats() {
-	//TODO
+	_, err := m.db.Exec(`REPLACE INTO cat_stats (date, cat, sales)
+		SELECT ?, cat, sum(sales) AS sales
+		FROM item_stats a
+		LEFT JOIN item_cats b
+		ON a.nid=b.nid
+		WHERE date = ?
+		GROUP BY cat
+	`, m.date4mysql, m.date4mysql)
+	ce(err, "update category sales")
 }
