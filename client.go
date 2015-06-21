@@ -91,7 +91,7 @@ func provideFreeProxyClients(clients chan<- *http.Client) {
 	entryPattern := regexp.MustCompile(`<tr><b><td>[0-9]+</td><td>([0-9.]+)</td><td>([0-9]+)</td>`)
 	for page := 1; page <= 10; page++ {
 		pageUrl := sp("http://www.proxy.com.ru/list_%d.html", page)
-		bs, err := hcutil.GetBytes(http.DefaultClient, pageUrl)
+		bs, err := getBytes(http.DefaultClient, pageUrl)
 		if err != nil {
 			pt("error getting %s\n", pageUrl)
 			continue
@@ -115,7 +115,7 @@ func provideFreeProxyClients(clients chan<- *http.Client) {
 	/*
 		for page := 1; page <= 300; page++ {
 			pageUrl := sp("http://www.kuaidaili.com/proxylist/%d/", page)
-			bs, err := hcutil.GetBytes(http.DefaultClient, pageUrl)
+			bs, err := getBytes(http.DefaultClient, pageUrl)
 			if err != nil {
 				pt("error getting %s: %v\n", pageUrl, err)
 				continue
@@ -148,7 +148,7 @@ func testClient(client *http.Client, addr string) bool {
 	pt("testing proxy %s\n", addr)
 	done := make(chan struct{})
 	go func() {
-		_, err := hcutil.GetBytes(client, "http://www.taobao.com")
+		_, err := getBytes(client, "http://www.taobao.com")
 		if err == nil {
 			close(done)
 		} else {

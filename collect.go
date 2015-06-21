@@ -72,7 +72,7 @@ collect:
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			clientSet.Do(func(client *http.Client) ClientState {
-				bs, err := hcutil.GetBytes(client, url)
+				bs, err := getBytes(client, url)
 				if err != nil {
 					//pt(sp("get %s error: %v\n", url, err))
 					return Bad

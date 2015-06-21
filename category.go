@@ -24,7 +24,7 @@ func collectCategories(backend Backend) {
 			if cat.Cat != 0 {
 				catStr = strconv.Itoa(cat.Cat)
 			}
-			bs, err := hcutil.GetBytes(client, sp("http://s.taobao.com/list?cat=%s", catStr))
+			bs, err := getBytes(client, sp("http://s.taobao.com/list?cat=%s", catStr))
 			if err != nil {
 				return Bad
 			}
