@@ -8,8 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/reusee/hcutil"
 )
 
 func collect(backend Backend) {

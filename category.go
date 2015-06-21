@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-
-	"github.com/reusee/hcutil"
 )
 
 func collectCategories(backend Backend) {
