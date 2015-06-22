@@ -5,17 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-const (
-	MaxPage = 20
-)
+var MaxPage = 20
 
 func collect(backend Backend) {
+	if len(os.Args) > 2 {
+		page, err := strconv.Atoi(os.Args[2])
+		ce(err, "parse max page")
+		MaxPage = page
+	}
+
 	// client set
 	clientSet := NewClientSet()
 	defer clientSet.Close()
