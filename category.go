@@ -35,16 +35,7 @@ func collectCategories(backend Backend) {
 			if err != nil {
 				return Bad
 			}
-			var nav struct {
-				Common []struct {
-					Text string
-					Sub  []struct {
-						Text  string
-						Key   string
-						Value string
-					}
-				}
-			}
+			var nav NavData
 			err = json.Unmarshal(config.Mods["nav"].Data, &nav)
 			if err != nil {
 				return Bad
@@ -83,4 +74,22 @@ func collectCategories(backend Backend) {
 
 	collectCategory(Cat{})
 
+}
+
+type NavData struct {
+	Common []struct {
+		Text string
+		Sub  []struct {
+			Text  string
+			Key   string
+			Value string
+		}
+	}
+	Breadcrumbs struct {
+		BaobeiTotalHit string
+		Catpath        []struct {
+			Catid string
+			Name  string
+		}
+	}
 }

@@ -5,9 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+)
+
+const (
+	MaxPage = 20
 )
 
 func collect(backend Backend) {
@@ -73,27 +78,41 @@ collect:
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {
-					//pt(sp("get %s error: %v\n", url, err))
 					return Bad
 				}
 				jstr, err := GetPageConfigJson(bs)
 				if err != nil {
-					//pt(sp("get %s page config error: %v\n", url, err))
 					return Bad
 				}
 				var config PageConfig
-				err = json.Unmarshal(jstr, &config)
-				if err != nil {
-					//pt(sp("unmarshal %s json error: %v\n", url, err))
+				if json.Unmarshal(jstr, &config) != nil {
 					return Bad
 				}
+				// check category in maininfo
+				catId, err := strconv.Atoi(config.MainInfo.SrpGlobal.Cat)
+				ce(err, "parse cat id in main info")
+				if catId != job.Cat {
+					return Bad
+				}
+				// check category in mod nav data
+				var navData NavData
+				if json.Unmarshal(config.Mods["nav"].Data, &navData) != nil {
+					return Bad
+				}
+				catPath := navData.Breadcrumbs.Catpath
+				lastCatidStr := catPath[len(catPath)-1].Catid
+				lastCatid, err := strconv.Atoi(lastCatidStr)
+				ce(err, sp("parse cat id %s", lastCatidStr))
+				if lastCatid != job.Cat {
+					return Bad
+				}
+				// get items
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
 					return Good
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
 				if err != nil {
-					//pt(sp("unmarshal item list %s error: %v\n", url, err))
 					return Bad
 				}
 				for {
@@ -109,12 +128,10 @@ collect:
 				var pagerData struct {
 					TotalPage int
 				}
-				err = json.Unmarshal(config.Mods["pager"].Data, &pagerData)
-				if err != nil {
-					//pt(sp("unmarshal pager %s error: %v\n", url, err))
+				if json.Unmarshal(config.Mods["pager"].Data, &pagerData) != nil {
 					return Bad
 				}
-				maxPage := 20
+				maxPage := MaxPage
 				if pagerData.TotalPage < maxPage {
 					maxPage = pagerData.TotalPage
 				}
@@ -161,6 +178,11 @@ type PageConfig struct {
 		Status string
 		Export bool
 		Data   json.RawMessage
+	}
+	MainInfo struct {
+		SrpGlobal struct {
+			Cat string
+		}
 	}
 }
 
