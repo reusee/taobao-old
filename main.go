@@ -44,6 +44,9 @@ func main() {
 		backend.Stats()
 	case "cats":
 		collectCategories(backend)
+
+	case "foo":
+		foo()
 	}
 }
 
