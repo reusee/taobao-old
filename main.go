@@ -111,13 +111,33 @@ type Source struct {
 }
 
 type Job struct {
-	Cat, Page int
-	Done      bool
-	Data      []byte
+	Cat, Page     int
+	Done          bool
+	Data          []byte
+	RefTotalCount int
 }
 
 type Cat struct {
 	Cat       int
 	Name      string
 	Relatives []int
+}
+
+type NavData struct {
+	Common []struct {
+		Text string
+		Sub  []struct {
+			Text  string
+			Key   string
+			Value string
+		}
+	}
+	Breadcrumbs struct {
+		BaobeiTotalHit string
+		Catpath        []struct {
+			Catid string
+			Name  string
+		}
+	}
+	Hidenav bool
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -83,29 +84,31 @@ collect:
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {
+					pt("get bytes\n")
 					return Bad
 				}
 				jstr, err := GetPageConfigJson(bs)
 				if err != nil {
+					pt("get page config\n")
 					return Bad
 				}
 				job.Data = jstr
 				var config PageConfig
 				if json.Unmarshal(jstr, &config) != nil {
+					pt("unmarshal\n")
 					return Bad
 				}
 				// check category in maininfo
 				catId, err := strconv.Atoi(config.MainInfo.SrpGlobal.Cat)
 				ce(err, "parse cat id in main info")
 				if catId != job.Cat {
+					pt("cat id invalid\n")
 					return Bad
 				}
 				// check category in mod nav data
 				var navData NavData
 				if json.Unmarshal(config.Mods["nav"].Data, &navData) != nil {
-					return Bad
-				}
-				if navData.Hidenav { // items not belong to this category
+					pt("unmarshal\n")
 					return Bad
 				}
 				catPath := navData.Breadcrumbs.Catpath
@@ -113,8 +116,25 @@ collect:
 				lastCatid, err := strconv.Atoi(lastCatidStr)
 				ce(err, sp("parse cat id %s", lastCatidStr))
 				if lastCatid != job.Cat {
+					pt("cat id not match\n")
 					return Bad
 				}
+				// get pager data
+				var pagerData struct {
+					TotalPage  int
+					TotalCount int
+				}
+				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
+					pt("unmarshal pager %v\n", err)
+					return Bad
+				}
+				// check total count
+				r := math.Abs(float64(pagerData.TotalCount) / float64(job.RefTotalCount))
+				if job.Page > 0 && r > 1.5 {
+					pt(sp("total count not match %d | %d | %f\n", pagerData.TotalCount, job.RefTotalCount, r))
+					return Bad
+				}
+				//TODO what if first-page is wrong?
 				// get items
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
@@ -122,6 +142,7 @@ collect:
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
 				if err != nil {
+					pt("get items\n")
 					return Bad
 				}
 				for {
@@ -131,14 +152,9 @@ collect:
 				}
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
+					// no more page of non-first page
 					markDone(job)
 					return Good
-				}
-				var pagerData struct {
-					TotalPage int
-				}
-				if json.Unmarshal(config.Mods["pager"].Data, &pagerData) != nil {
-					return Bad
 				}
 				maxPage := MaxPage
 				if pagerData.TotalPage < maxPage {
@@ -147,9 +163,10 @@ collect:
 				js := []Job{}
 				for i := 1; i < maxPage; i++ {
 					js = append(js, Job{
-						Cat:  job.Cat,
-						Page: i,
-						Done: false,
+						Cat:           job.Cat,
+						Page:          i,
+						Done:          false,
+						RefTotalCount: pagerData.TotalCount,
 					})
 				}
 				ce(backend.AddJobs(js), "add jobs")
