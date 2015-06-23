@@ -130,7 +130,8 @@ collect:
 				}
 				// check total count
 				r := math.Abs(float64(pagerData.TotalCount) / float64(job.RefTotalCount))
-				if job.Page > 0 && r > 1.5 {
+				d := math.Abs(float64(pagerData.TotalCount - job.RefTotalCount))
+				if job.Page > 0 && r > 3.0 && d > 800 {
 					pt(sp("total count not match %d | %d | %f\n", pagerData.TotalCount, job.RefTotalCount, r))
 					return Bad
 				}
