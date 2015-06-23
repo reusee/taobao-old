@@ -92,9 +92,9 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 		nid, err := strconv.Atoi(item.Nid)
 		ce(err, sp("parse nid %s", item.Nid))
 		_, err = m.db.Exec(`INSERT INTO items (
-			nid, title, raw_title, pic_url, detail_url, comment_url, 
+			nid, title, pic_url, detail_url, comment_url, 
 			location, seller, shop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nid=nid`,
-			nid, item.Title, item.Raw_title, item.Pic_url, item.Detail_url, item.Comment_url,
+			nid, item.Title, item.Pic_url, item.Detail_url, item.Comment_url,
 			item.Item_loc, uid, item.Shopcard.EncryptedUserId)
 		ce(err, "insert item")
 		//item stats

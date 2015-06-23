@@ -28,7 +28,6 @@ func (m *Mysql) checkSchema() (err error) {
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS items (
 		nid BIGINT PRIMARY KEY,
 		title TEXT,
-		raw_title TEXT,
 		pic_url TEXT,
 		detail_url TEXT,
 		comment_url TEXT,
