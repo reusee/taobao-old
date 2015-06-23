@@ -111,10 +111,9 @@ type Source struct {
 }
 
 type Job struct {
-	Cat, Page     int
-	Done          bool
-	Data          []byte
-	RefTotalCount int
+	Cat, Page int
+	Done      bool
+	Data      []byte
 }
 
 type Cat struct {

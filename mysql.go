@@ -45,8 +45,8 @@ func (m *Mysql) AddJobs(jobs []Job) (err error) {
 	tx, err := m.db.Begin()
 	ce(err, "start transaction")
 	for _, job := range jobs {
-		_, err := tx.Exec(sp(`INSERT INTO jobs_%s (cat, page, ref_total_count) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cat=cat`, m.date),
-			job.Cat, job.Page, job.RefTotalCount)
+		_, err := tx.Exec(sp(`INSERT INTO jobs_%s (cat, page) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cat=cat`, m.date),
+			job.Cat, job.Page)
 		ce(err, "add job")
 	}
 	ce(tx.Commit(), "commit")
@@ -61,11 +61,11 @@ func (m *Mysql) DoneJob(job Job) error {
 
 func (m *Mysql) GetJobs() (jobs []Job, err error) {
 	defer ct(&err)
-	rows, err := m.db.Query(sp(`SELECT cat, page, ref_total_count FROM jobs_%s WHERE done = false`, m.date))
+	rows, err := m.db.Query(sp(`SELECT cat, page FROM jobs_%s WHERE done = false`, m.date))
 	ce(err, "query")
 	for rows.Next() {
 		var job Job
-		err = rows.Scan(&job.Cat, &job.Page, &job.RefTotalCount)
+		err = rows.Scan(&job.Cat, &job.Page)
 		ce(err, "scan")
 		jobs = append(jobs, job)
 	}

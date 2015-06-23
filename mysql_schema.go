@@ -7,7 +7,6 @@ func (m *Mysql) checkSchema() (err error) {
 		cat BIGINT REFERENCES cats(cat),
 		page SMALLINT,
 		done BOOL NOT NULL DEFAULT false,
-		ref_total_count BIGINT,
 		PRIMARY KEY (cat, page)
 	) ENGINE = TokuDB`, m.date))
 	ce(err, "create table jobs")
