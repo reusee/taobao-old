@@ -89,6 +89,7 @@ collect:
 				if err != nil {
 					return Bad
 				}
+				job.Data = jstr
 				var config PageConfig
 				if json.Unmarshal(jstr, &config) != nil {
 					return Bad
@@ -102,6 +103,9 @@ collect:
 				// check category in mod nav data
 				var navData NavData
 				if json.Unmarshal(config.Mods["nav"].Data, &navData) != nil {
+					return Bad
+				}
+				if navData.Hidenav { // items not belong to this category
 					return Bad
 				}
 				catPath := navData.Breadcrumbs.Catpath

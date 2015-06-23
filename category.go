@@ -92,4 +92,5 @@ type NavData struct {
 			Name  string
 		}
 	}
+	Hidenav bool
 }

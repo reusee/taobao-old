@@ -46,7 +46,7 @@ func main() {
 		collectCategories(backend)
 
 	case "foo":
-		foo()
+		backend.Foo()
 	}
 }
 
@@ -59,6 +59,7 @@ type Backend interface {
 	GetCats() ([]Cat, error)
 
 	Stats()
+	Foo()
 
 	LogClient(ClientInfo, ClientState)
 }
@@ -112,6 +113,7 @@ type Source struct {
 type Job struct {
 	Cat, Page int
 	Done      bool
+	Data      []byte
 }
 
 type Cat struct {
