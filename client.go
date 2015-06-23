@@ -25,6 +25,14 @@ type ClientInfo struct {
 func NewClientSet() *ClientSet {
 	in, out, kill := NewClientsChan()
 
+	s := &ClientSet{
+		in:    in,
+		out:   out,
+		kill:  kill,
+		good:  make(map[*http.Client]int),
+		infos: make(map[*http.Client]ClientInfo),
+	}
+
 	// local ss proxies
 	go func() {
 		proxies := []string{
@@ -49,14 +57,6 @@ func NewClientSet() *ClientSet {
 			in <- client
 		}
 	}()
-
-	s := &ClientSet{
-		in:    in,
-		out:   out,
-		kill:  kill,
-		good:  make(map[*http.Client]int),
-		infos: make(map[*http.Client]ClientInfo),
-	}
 
 	// free proxies
 	go s.provideFreeProxyClients()
