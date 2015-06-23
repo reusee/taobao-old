@@ -45,7 +45,7 @@ func (m *Mysql) AddJobs(jobs []Job) (err error) {
 	tx, err := m.db.Begin()
 	ce(err, "start transaction")
 	for _, job := range jobs {
-		_, err := tx.Exec(sp(`INSERT INTO jobs_%s (cat, page) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cat=cat`, m.date),
+		_, err := tx.Exec(sp(`INSERT INTO jobs_%s (cat, page) VALUES (?, ?) ON DUPLICATE KEY UPDATE cat=cat`, m.date),
 			job.Cat, job.Page)
 		ce(err, "add job")
 	}
