@@ -70,7 +70,6 @@ collect:
 	jobsTotal = int64(len(jobs))
 	jobsDone = 0
 	sem := make(chan struct{}, 256)
-	mx := new(sync.Mutex)
 	for _, job := range jobs {
 		job := job
 		sem <- struct{}{}
@@ -81,19 +80,8 @@ collect:
 				<-sem
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
-			tc := NewTrace(sp("job %d %d", job.Cat, job.Page))
-			if false {
-				defer tc.Done(func(trace *Trace) {
-					mx.Lock()
-					defer mx.Unlock()
-					for _, tick := range trace.Ticks {
-						pt("%s\n", tick.What)
-					}
-					pt("\n")
-				})
-			} else {
-				defer tc.Done(nil)
-			}
+			tc := tracer.Begin(sp("job %d %d", job.Cat, job.Page))
+			defer tc.End()
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {

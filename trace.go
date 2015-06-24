@@ -1,18 +1,45 @@
 package main
 
+import "sync"
+
+var tracer *Tracer
+
+func init() {
+	tracer = NewTracer()
+}
+
+type Tracer struct {
+	Traces      []*Trace
+	EndedTraces []*Trace //TODO
+	lock        *sync.Mutex
+}
+
 type Trace struct {
-	What  string
-	Ticks []Tick
+	ended  bool
+	What   string
+	Ticks  []Tick
+	tracer *Tracer
 }
 
 type Tick struct {
 	What string
 }
 
-func NewTrace(what string) *Trace {
-	return &Trace{
-		What: what,
+func NewTracer() *Tracer {
+	return &Tracer{
+		lock: new(sync.Mutex),
 	}
+}
+
+func (r *Tracer) Begin(what string) *Trace {
+	t := &Trace{
+		What:   what,
+		tracer: r,
+	}
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.Traces = append(r.Traces, t)
+	return t
 }
 
 func (t *Trace) Tick(what string) {
@@ -21,8 +48,6 @@ func (t *Trace) Tick(what string) {
 	})
 }
 
-func (t *Trace) Done(handler func(*Trace)) {
-	if handler != nil {
-		handler(t)
-	}
+func (t *Trace) End() {
+	t.ended = true
 }
