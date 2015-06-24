@@ -23,6 +23,7 @@ func init() {
 	hcutil.DefaultRetryCount = 1
 	hcutil.DefaultRetryInterval = time.Millisecond * 200
 
+	web()
 	go http.ListenAndServe("127.0.0.1:9991", nil)
 }
 

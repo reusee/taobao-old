@@ -1,0 +1,24 @@
+{
+  "name": "web-tpl",
+  "version": "0.0.0",
+  "homepage": "https://github.com/reusee/web-tpl",
+  "authors": [
+    "reus <reusee@gmail.com>"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "respond": "~1.4.2",
+    "html5shiv": "~3.7.2",
+    "jquery": "~1.11",
+    "bootstrap": "~3.3.4",
+    "riot": "~2.1.0",
+    "es5-shim": "~4.1.6"
+  }
+}
