@@ -70,6 +70,7 @@ collect:
 	jobsTotal = int64(len(jobs))
 	jobsDone = 0
 	sem := make(chan struct{}, 256)
+	mx := new(sync.Mutex)
 	for _, job := range jobs {
 		job := job
 		sem <- struct{}{}
@@ -81,7 +82,18 @@ collect:
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			tc := NewTrace(sp("job %d %d", job.Cat, job.Page))
-			defer tc.Done(nil)
+			if false {
+				defer tc.Done(func(trace *Trace) {
+					mx.Lock()
+					defer mx.Unlock()
+					for _, tick := range trace.Ticks {
+						pt("%s\n", tick.What)
+					}
+					pt("\n")
+				})
+			} else {
+				defer tc.Done(nil)
+			}
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {
@@ -91,13 +103,13 @@ collect:
 				jstr, err := GetPageConfigJson(bs)
 				if err != nil {
 					tc.Tick(sp("get page config error %v", err))
-					return Bad
+					return Retry
 				}
 				job.Data = jstr
 				var config PageConfig
 				if err := json.Unmarshal(jstr, &config); err != nil {
 					tc.Tick(sp("unmarshal page config error %v", err))
-					return Bad
+					return Retry
 				}
 				// get pager data
 				var pagerData struct {
@@ -106,7 +118,7 @@ collect:
 				}
 				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
 					tc.Tick(sp("unmarshal mod pager error %v", err))
-					return Bad
+					return Retry
 				}
 				// get items
 				if config.Mods["itemlist"].Status == "hide" { // no items
@@ -117,13 +129,15 @@ collect:
 				items, err := GetItems(config.Mods["itemlist"].Data)
 				if err != nil {
 					tc.Tick(sp("get items error %v", err))
-					return Bad
+					return Retry
 				}
 				// save
 				for {
-					if backend.AddItems(items, job) == nil {
-						break
+					if err := backend.AddItems(items, job); err != nil {
+						pt("%v\n", err)
+						continue
 					}
+					break
 				}
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {

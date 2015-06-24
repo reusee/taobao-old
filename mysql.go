@@ -93,7 +93,7 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 		ce(err, sp("parse nid %s", item.Nid))
 		_, err = m.db.Exec(`INSERT INTO items (
 			nid, title, pic_url, detail_url, comment_url, 
-			location, seller, shop) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nid=nid`,
+			location, seller, shop) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nid=nid`,
 			nid, item.Title, item.Pic_url, item.Detail_url, item.Comment_url,
 			item.Item_loc, uid, item.Shopcard.EncryptedUserId)
 		ce(err, "insert item")
