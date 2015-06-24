@@ -39,3 +39,9 @@ func getBytes(client *http.Client, url string) (ret []byte, err error) {
 	ce(err, "read")
 	return buf.Bytes(), nil
 }
+
+func lp() {
+	if p := recover(); p != nil {
+		pt("%v\n", p)
+	}
+}
