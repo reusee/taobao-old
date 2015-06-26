@@ -17,6 +17,7 @@ var (
 	ct = catch.Catch
 	pt = fmt.Printf
 	sp = fmt.Sprintf
+	fw = fmt.Fprintf
 )
 
 func init() {

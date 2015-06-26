@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"sync"
 	"sync/atomic"
 )
@@ -45,6 +46,24 @@ func (s *TraceSet) Enable() {
 
 func (s *TraceSet) Disable() {
 	s.enabled.Store(false)
+}
+
+func (s *TraceSet) Dump(w io.Writer) {
+	s.RLock()
+	traces := make([]*Trace, len(s.traces))
+	copy(traces, s.traces)
+	s.RUnlock()
+	for _, trace := range traces {
+		fw(w, trace.what)
+		trace.RLock()
+		entries := make([]*Entry, len(trace.entries))
+		copy(entries, trace.entries)
+		trace.RUnlock()
+		for _, entry := range entries {
+			fw(w, entry.Message)
+		}
+		fw(w, "\n")
+	}
 }
 
 func (t *Trace) Log(msg string) {
