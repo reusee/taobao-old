@@ -57,6 +57,8 @@ func collect(backend Backend) {
 		}
 	}()
 
+	jobTraceSet := NewTraceSet()
+
 	// collect
 collect:
 	jobs, err = backend.GetJobs()
@@ -80,23 +82,22 @@ collect:
 				<-sem
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
-			tc := tracer.Begin(sp("job %d %d", job.Cat, job.Page))
-			defer tc.End()
+			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {
-					tc.Tick(sp("get bytes error %v", err))
+					tc.Log(sp("get bytes error %v", err))
 					return Bad
 				}
 				jstr, err := GetPageConfigJson(bs)
 				if err != nil {
-					tc.Tick(sp("get page config error %v", err))
+					tc.Log(sp("get page config error %v", err))
 					return Bad
 				}
 				job.Data = jstr
 				var config PageConfig
 				if err := json.Unmarshal(jstr, &config); err != nil {
-					tc.Tick(sp("unmarshal page config error %v", err))
+					tc.Log(sp("unmarshal page config error %v", err))
 					return Bad
 				}
 				// get pager data
@@ -105,18 +106,18 @@ collect:
 					TotalCount int
 				}
 				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
-					tc.Tick(sp("unmarshal mod pager error %v", err))
+					tc.Log(sp("unmarshal mod pager error %v", err))
 					return Bad
 				}
 				// get items
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
-					tc.Tick("no items found")
+					tc.Log("no items found")
 					return Good
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
 				if err != nil {
-					tc.Tick(sp("get items error %v", err))
+					tc.Log(sp("get items error %v", err))
 					return Bad
 				}
 				// save
@@ -130,7 +131,7 @@ collect:
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 					markDone(job)
-					tc.Tick("only one page")
+					tc.Log("only one page")
 					return Good
 				}
 				maxPage := MaxPage
@@ -147,7 +148,7 @@ collect:
 				}
 				ce(backend.AddJobs(js), "add jobs")
 				markDone(job)
-				tc.Tick(sp("add %d jobs", len(js)))
+				tc.Log(sp("add %d jobs", len(js)))
 				return Good
 			})
 		}()

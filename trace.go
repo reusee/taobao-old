@@ -5,66 +5,56 @@ import (
 	"sync/atomic"
 )
 
-var tracer *Tracer
-
-func init() {
-	tracer = NewTracer()
-}
-
-type Tracer struct {
-	enabled     atomic.Value
-	Traces      []*Trace
-	EndedTraces []*Trace //TODO
-	lock        *sync.Mutex
+type TraceSet struct {
+	sync.RWMutex
+	enabled atomic.Value
+	traces  []*Trace
 }
 
 type Trace struct {
-	ended  bool
-	What   string
-	Ticks  []Tick
-	tracer *Tracer
+	sync.RWMutex
+	enabled *atomic.Value
+	what    string
+	entries []*Entry
 }
 
-type Tick struct {
-	What string
+type Entry struct {
+	Message string
 }
 
-func NewTracer() *Tracer {
-	t := &Tracer{
-		lock: new(sync.Mutex),
-	}
-	t.enabled.Store(false)
-	return t
+func NewTraceSet() *TraceSet {
+	s := &TraceSet{}
+	s.enabled.Store(true)
+	return s
 }
 
-func (r *Tracer) Begin(what string) *Trace {
+func (s *TraceSet) NewTrace(what string) *Trace {
 	t := &Trace{
-		What:   what,
-		tracer: r,
+		enabled: &s.enabled,
+		what:    what,
 	}
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	r.Traces = append(r.Traces, t)
+	s.Lock()
+	s.traces = append(s.traces, t)
+	s.Unlock()
 	return t
 }
 
-func (r *Tracer) Enable() {
-	r.enabled.Store(true)
+func (s *TraceSet) Enable() {
+	s.enabled.Store(true)
 }
 
-func (r *Tracer) Disable() {
-	r.enabled.Store(false)
+func (s *TraceSet) Disable() {
+	s.enabled.Store(false)
 }
 
-func (t *Trace) Tick(what string) {
-	if !t.tracer.enabled.Load().(bool) {
+func (t *Trace) Log(msg string) {
+	if !t.enabled.Load().(bool) {
 		return
 	}
-	t.Ticks = append(t.Ticks, Tick{
-		What: what,
-	})
-}
-
-func (t *Trace) End() {
-	t.ended = true
+	e := &Entry{
+		Message: msg,
+	}
+	t.Lock()
+	t.entries = append(t.entries, e)
+	t.Unlock()
 }
