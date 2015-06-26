@@ -91,13 +91,13 @@ collect:
 				jstr, err := GetPageConfigJson(bs)
 				if err != nil {
 					tc.Tick(sp("get page config error %v", err))
-					return Retry
+					return Bad
 				}
 				job.Data = jstr
 				var config PageConfig
 				if err := json.Unmarshal(jstr, &config); err != nil {
 					tc.Tick(sp("unmarshal page config error %v", err))
-					return Retry
+					return Bad
 				}
 				// get pager data
 				var pagerData struct {
@@ -106,7 +106,7 @@ collect:
 				}
 				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
 					tc.Tick(sp("unmarshal mod pager error %v", err))
-					return Retry
+					return Bad
 				}
 				// get items
 				if config.Mods["itemlist"].Status == "hide" { // no items
@@ -117,7 +117,7 @@ collect:
 				items, err := GetItems(config.Mods["itemlist"].Data)
 				if err != nil {
 					tc.Tick(sp("get items error %v", err))
-					return Retry
+					return Bad
 				}
 				// save
 				for {

@@ -69,7 +69,6 @@ type ClientState uint8
 const (
 	Good ClientState = iota
 	Bad
-	Retry
 )
 
 func (s *ClientSet) Do(fn func(client *http.Client) ClientState) {
@@ -95,8 +94,6 @@ loop:
 			if s.Logger != nil {
 				s.Logger(s.infos[client], Bad)
 			}
-		case Retry:
-			s.in <- client
 		}
 	}
 }
