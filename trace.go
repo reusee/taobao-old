@@ -50,34 +50,43 @@ func (s *TraceSet) Disable() {
 	s.enabled.Store(false)
 }
 
-func (s *TraceSet) Dump(w io.Writer, fns ...interface{}) {
+func (s *TraceSet) Dump(w io.Writer, specs ...interface{}) {
 	s.RLock()
 	traces := make(Traces, len(s.traces))
 	copy(traces, s.traces)
 	s.RUnlock()
-	for _, fn := range fns {
-		switch fn := fn.(type) {
+	var each func(*Trace)
+	for _, spec := range specs {
+		switch spec := spec.(type) {
 		case func(*Trace) *Trace: // map
-			traces = traces.Map(fn)
+			traces = traces.Map(spec)
 		case func(*Trace) bool: // filter
-			traces = traces.Filter(fn)
+			traces = traces.Filter(spec)
 		case func(*Trace, *Trace) bool: // sort
-			traces.Sort(fn)
+			traces.Sort(spec)
+		case func(*Trace): // each
+			each = spec
 		default: // invalid
-			panic(sp("invalid function type %T", fn))
+			panic(sp("invalid spec type %T", spec))
 		}
 	}
-	for _, trace := range traces {
-		fw(w, trace.what)
-		trace.RLock()
-		entries := make([]*Entry, len(trace.entries))
-		copy(entries, trace.entries)
-		trace.RUnlock()
-		for _, entry := range entries {
-			fw(w, entry.Message)
+	if each == nil {
+		each = func(trace *Trace) {
+			fw(w, trace.what)
+			for _, entry := range trace.Entries() {
+				fw(w, entry.Message)
+			}
+			fw(w, "\n\n")
 		}
-		fw(w, "\n")
 	}
+	traces.Each(each)
+}
+
+func (t *Trace) Entries() []*Entry {
+	t.RLock()
+	entries := make([]*Entry, len(t.entries))
+	copy(entries, t.entries)
+	t.RUnlock()
 }
 
 func (t *Trace) Log(msg string) {
