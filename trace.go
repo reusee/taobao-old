@@ -9,7 +9,7 @@ import (
 type TraceSet struct {
 	sync.RWMutex
 	enabled atomic.Value
-	traces  []*Trace
+	traces  Traces
 }
 
 type Trace struct {
@@ -48,11 +48,23 @@ func (s *TraceSet) Disable() {
 	s.enabled.Store(false)
 }
 
-func (s *TraceSet) Dump(w io.Writer) {
+func (s *TraceSet) Dump(w io.Writer, fns ...interface{}) {
 	s.RLock()
-	traces := make([]*Trace, len(s.traces))
+	traces := make(Traces, len(s.traces))
 	copy(traces, s.traces)
 	s.RUnlock()
+	for _, fn := range fns {
+		switch fn := fn.(type) {
+		case func(*Trace) *Trace: // map
+			traces = traces.Map(fn)
+		case func(*Trace) bool: // filter
+			traces = traces.Filter(fn)
+		case func(*Trace, *Trace) bool: // sort
+			traces.Sort(fn)
+		default: // invalid
+			panic(sp("invalid function type %T", fn))
+		}
+	}
 	for _, trace := range traces {
 		fw(w, trace.what)
 		trace.RLock()
