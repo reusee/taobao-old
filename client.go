@@ -4,12 +4,14 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/reusee/hcutil"
 )
 
 type ClientSet struct {
+	sync.RWMutex
 	in     chan<- *http.Client
 	out    <-chan *http.Client
 	kill   chan struct{}
@@ -83,7 +85,9 @@ loop:
 			s.in <- client
 			s.good[client]++
 			if s.Logger != nil {
+				s.RLock()
 				s.Logger(s.infos[client], Good)
+				s.RUnlock()
 			}
 			break loop
 		case Bad:
@@ -92,7 +96,9 @@ loop:
 				s.in <- client
 			}
 			if s.Logger != nil {
+				s.RLock()
 				s.Logger(s.infos[client], Bad)
+				s.RUnlock()
 			}
 		}
 	}
@@ -122,9 +128,11 @@ func (s *ClientSet) provideFreeProxyClients() {
 				},
 				Timeout: time.Second * 32,
 			}
+			s.Lock()
 			s.infos[client] = ClientInfo{
 				HttpProxyAddr: addr,
 			}
+			s.Unlock()
 			time.Sleep(time.Millisecond * 200)
 			s.in <- client
 		}
