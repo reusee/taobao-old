@@ -13,6 +13,7 @@ import (
 )
 
 var MaxPage = 20
+var jobTraceSet = NewTraceSet()
 
 func collect(backend Backend) {
 	if len(os.Args) > 2 {
@@ -57,8 +58,6 @@ func collect(backend Backend) {
 		}
 	}()
 
-	jobTraceSet := NewTraceSet()
-
 	// collect
 collect:
 	jobs, err = backend.GetJobs()
@@ -83,6 +82,7 @@ collect:
 			}()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
+			defer tc.SetFlag("done")
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {

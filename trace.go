@@ -17,6 +17,7 @@ type Trace struct {
 	enabled *atomic.Value
 	what    string
 	entries []*Entry
+	flags   map[string]struct{}
 }
 
 type Entry struct {
@@ -33,6 +34,7 @@ func (s *TraceSet) NewTrace(what string) *Trace {
 	t := &Trace{
 		enabled: &s.enabled,
 		what:    what,
+		flags:   make(map[string]struct{}),
 	}
 	s.Lock()
 	s.traces = append(s.traces, t)
@@ -88,4 +90,23 @@ func (t *Trace) Log(msg string) {
 	t.Lock()
 	t.entries = append(t.entries, e)
 	t.Unlock()
+}
+
+func (t *Trace) SetFlag(flag string) {
+	t.Lock()
+	t.flags[flag] = struct{}{}
+	t.Unlock()
+}
+
+func (t *Trace) ClearFlag(flag string) {
+	t.Lock()
+	delete(t.flags, flag)
+	t.Unlock()
+}
+
+func (t *Trace) Flag(flag string) (ret bool) {
+	t.Lock()
+	_, ret = t.flags[flag]
+	t.Unlock()
+	return
 }
