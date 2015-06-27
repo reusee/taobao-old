@@ -87,6 +87,7 @@ func (t *Trace) Entries() []*Entry {
 	entries := make([]*Entry, len(t.entries))
 	copy(entries, t.entries)
 	t.RUnlock()
+	return entries
 }
 
 func (t *Trace) Log(msg string) {
