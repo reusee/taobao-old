@@ -18,22 +18,40 @@
     <![endif]-->
   </head>
   <body>
-    <script>
-    var ws = new WebSocket("ws://localhost:9991/ws");
-    ws.onopen = function() {
-      ws.send("foobarbaz")
-    }
-    ws.onmessage = function(e) {
-      console.log('received');
-      console.log(e);
-    }
+    
+    <script type="riot/tag">
+    <jobs>
+      <div class="trace" each={traces}>
+        <h4>{What}</h4>
+        <p class="entry" each={Entries}>{Message}</p>
+      </div>
+      var self = this;
+      self.on('mount', function() {
+        $.ajax({
+          url: opts.src,
+          dataType: 'json',
+          cache: false,
+          success: function(data) {
+            self.update({traces: data});
+          }.bind(self),
+          error: function(xhr, status, err) {
+            console.error(url, status, err.toString());
+          }.bind(self)
+        });
+      });
+    </jobs>
     </script>
+    <jobs></jobs>
+
 
     <script src="bower_components/jquery/dist/jquery.min.js"></script>
     <script src="bower_components/bootstrap/dist/js/bootstrap.min.js"></script>
     <script src="bower_components/riot/riot+compiler.min.js"></script>
     <script>
-      riot.mount('*');
+      riot.mount('jobs', {src: '/jobs.json'});
+      riot.route(function(path) {
+        console.log(path);
+      });
     </script>
   </body>
 </html>
