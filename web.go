@@ -38,4 +38,15 @@ func web() {
 			time.Sleep(time.Second)
 		}
 	})
+
+	http.HandleFunc("/jobs", func(w http.ResponseWriter, r *http.Request) {
+		jobTraceSet.Dump(w, func(trace *Trace) bool {
+			return !trace.Flag("done")
+		})
+	})
+	http.HandleFunc("/done_jobs", func(w http.ResponseWriter, r *http.Request) {
+		jobTraceSet.Dump(w, func(trace *Trace) bool {
+			return trace.Flag("done")
+		})
+	})
 }
