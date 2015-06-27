@@ -100,15 +100,6 @@ collect:
 					tc.Log(sp("unmarshal page config error %v", err))
 					return Bad
 				}
-				// get pager data
-				var pagerData struct {
-					TotalPage  int
-					TotalCount int
-				}
-				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
-					tc.Log(sp("unmarshal mod pager error %v", err))
-					return Bad
-				}
 				// get items
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
@@ -135,6 +126,15 @@ collect:
 					return Good
 				}
 				maxPage := MaxPage
+				// get pager data
+				var pagerData struct {
+					TotalPage  int
+					TotalCount int
+				}
+				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
+					tc.Log(sp("unmarshal mod pager error %v", err))
+					return Bad
+				}
 				if pagerData.TotalPage < maxPage {
 					maxPage = pagerData.TotalPage
 				}
