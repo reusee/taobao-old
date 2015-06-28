@@ -77,7 +77,6 @@ func (m *Mysql) GetJobs() (jobs []Job, err error) {
 func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	for _, item := range items {
-		ce(err, "start transaction")
 		//user
 		uid, err := strconv.Atoi(item.User_id)
 		ce(err, sp("parse uid %s", item.User_id))
