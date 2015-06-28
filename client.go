@@ -77,29 +77,31 @@ func (s *ClientSet) Do(fn func(client *http.Client) ClientState) {
 loop:
 	for {
 		client := <-s.out
+		s.Lock()
 		if _, ok := s.good[client]; !ok {
 			s.good[client] = 3
 		}
+		s.Unlock()
 		switch fn(client) {
 		case Good:
 			s.in <- client
+			s.Lock()
 			s.good[client]++
 			if s.Logger != nil {
-				s.RLock()
 				s.Logger(s.infos[client], Good)
-				s.RUnlock()
 			}
+			s.Unlock()
 			break loop
 		case Bad:
+			s.Lock()
 			if s.good[client] > 0 {
 				s.good[client]--
 				s.in <- client
 			}
 			if s.Logger != nil {
-				s.RLock()
 				s.Logger(s.infos[client], Bad)
-				s.RUnlock()
 			}
+			s.Unlock()
 		}
 	}
 }
