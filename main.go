@@ -8,13 +8,10 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
-	"github.com/reusee/catch"
 	"github.com/reusee/hcutil"
 )
 
 var (
-	ce = catch.PkgChecker("taobao")
-	ct = catch.Catch
 	pt = fmt.Printf
 	sp = fmt.Sprintf
 	fw = fmt.Fprintf
