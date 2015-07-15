@@ -18,7 +18,7 @@ type Mysql struct {
 func NewMysql() (m *Mysql, err error) {
 	defer ct(&err)
 
-	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/taobao?tokudb_commit_sync=off")
+	db, err := sql.Open("mysql", "root@unix(/var/run/mysqld/mysqld.sock)/taobao?tokudb_commit_sync=off&parseTime=true")
 	ce(err, "open sql connection")
 
 	now := time.Now()
@@ -154,6 +154,22 @@ func (m *Mysql) AddBgCat(cat Cat) (err error) {
 	_, err = m.db.Exec(`INSERT INTO bgcats (cat, name, parent) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cat=cat`,
 		cat.Cat, cat.Name, cat.Parent)
 	ce(err, "insert")
+	return
+}
+
+func (m *Mysql) GetBgCatInfo(cat int) (info CatInfo, err error) {
+	err = m.db.QueryRow(`SELECT last_checked FROM bgcats_info WHERE cat = ?`, cat).Scan(
+		&info.LastChecked)
+	switch {
+	case err == sql.ErrNoRows:
+		err = nil
+	}
+	return
+}
+
+func (m *Mysql) SetBgCatInfo(cat int, info CatInfo) (err error) {
+	_, err = m.db.Exec(`REPLACE INTO bgcats_info (cat, last_checked) VALUES (?, ?)`,
+		cat, info.LastChecked)
 	return
 }
 

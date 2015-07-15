@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
 	"golang.org/x/text/transform"
@@ -25,6 +26,17 @@ func collectBackgroundCategories(backend Backend) {
 
 	var collect func(string, string)
 	collect = func(path string, sid string) {
+		if sid != "" {
+			cat, err := strconv.Atoi(sid)
+			ce(err, "strconv")
+			info, err := backend.GetBgCatInfo(cat)
+			ce(err, "get info")
+			if time.Now().Sub(info.LastChecked) < time.Hour*24*5 {
+				pt("skip %d\n", cat)
+				return
+			}
+		}
+
 		addr := "http://upload.taobao.com/auction/json/reload_cats.htm?customId="
 		req, err := http.NewRequest("POST", addr, strings.NewReader(url.Values{
 			"path": {path},
@@ -34,20 +46,13 @@ func collectBackgroundCategories(backend Backend) {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 		req.Header.Set("Cookie", string(cookie))
 		resp, err := client.Do(req)
-		ce(err, "get cats")
+		ce(err, "do")
 		defer resp.Body.Close()
 		content, err := ioutil.ReadAll(resp.Body)
 		ce(err, "read body")
 		r := transform.NewReader(bytes.NewReader(content), simplifiedchinese.GBK.NewDecoder())
 		content, err = ioutil.ReadAll(r)
 		ce(err, "conv gbk")
-
-		/*
-			buf := new(bytes.Buffer)
-			err = json.Indent(buf, content, "", "\t")
-			ce(err, "indent")
-			pt("%s\n", buf.Bytes())
-		*/
 
 		var data []struct {
 			Data []struct {
@@ -83,6 +88,13 @@ func collectBackgroundCategories(backend Backend) {
 				collect("next", row.Sid)
 			}
 		}
+
+		cat, err := strconv.Atoi(sid)
+		ce(err, "strconv")
+		err = backend.SetBgCatInfo(cat, CatInfo{
+			LastChecked: time.Now(),
+		})
+		ce(err, "set bgcat info")
 		return
 	}
 	collect("all", "")

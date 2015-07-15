@@ -112,8 +112,14 @@ func (m *Mysql) checkSchema() (err error) {
 		cat BIGINT PRIMARY KEY,
 		parent BIGINT REFERENCES cat,
 		name TEXT
-	) ENGINE =TokuDB`)
+	) ENGINE = TokuDB`)
 	ce(err, "create background cats table")
+
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS bgcats_info (
+		cat BIGINT PRIMARY KEY,
+		last_checked DATETIME
+	) ENGINE = TokuDB`)
+	ce(err, "create background cats info table")
 
 	return nil
 }
