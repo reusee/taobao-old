@@ -43,6 +43,8 @@ func main() {
 		backend.Stats()
 	case "cats":
 		collectCategories(backend)
+	case "bgcats":
+		collectBackgroundCategories(backend)
 
 	case "foo":
 		backend.Foo()
@@ -56,6 +58,7 @@ type Backend interface {
 	AddItems([]Item, Job) error
 	AddCat(Cat) error
 	GetCats() ([]Cat, error)
+	AddBgCat(Cat) error
 
 	Stats()
 	Foo()
@@ -119,6 +122,7 @@ type Cat struct {
 	Cat       int
 	Name      string
 	Relatives []int
+	Parent    int
 }
 
 type NavData struct {

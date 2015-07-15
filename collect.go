@@ -70,7 +70,7 @@ collect:
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
 	jobsDone = 0
-	sem := make(chan struct{}, 256)
+	sem := make(chan struct{}, 128)
 	for _, job := range jobs {
 		job := job
 		sem <- struct{}{}

@@ -149,6 +149,14 @@ func (m *Mysql) GetCats() (cats []Cat, err error) {
 	return
 }
 
+func (m *Mysql) AddBgCat(cat Cat) (err error) {
+	defer ct(&err)
+	_, err = m.db.Exec(`INSERT INTO bgcats (cat, name, parent) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE cat=cat`,
+		cat.Cat, cat.Name, cat.Parent)
+	ce(err, "insert")
+	return
+}
+
 func (m *Mysql) Stats() {
 	_, err := m.db.Exec(`REPLACE INTO cat_stats (date, cat, sales)
 		SELECT ?, cat, sum(sales) AS sales

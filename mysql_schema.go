@@ -108,5 +108,12 @@ func (m *Mysql) checkSchema() (err error) {
 	) ENGINE = TokuDB`)
 	ce(err, "create table proxies")
 
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS bgcats (
+		cat BIGINT PRIMARY KEY,
+		parent BIGINT REFERENCES cat,
+		name TEXT
+	) ENGINE =TokuDB`)
+	ce(err, "create background cats table")
+
 	return nil
 }
