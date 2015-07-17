@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,6 +68,9 @@ collect:
 		return
 	}
 	Jobs(jobs).Shuffle()
+	// skip following pages if all item has no sales.
+	skipPage := make(map[int]int)
+	skipPageLock := new(sync.Mutex)
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
@@ -81,6 +85,14 @@ collect:
 				atomic.AddInt64(&jobsDone, 1)
 				<-sem
 			}()
+			skipPageLock.Lock()
+			if p, ok := skipPage[job.Cat]; ok && job.Page > p {
+				// skip this page
+				tc.Log(sp("skip page after %d", p))
+				skipPageLock.Unlock()
+				return
+			}
+			skipPageLock.Unlock()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
 			defer tc.SetFlag("done")
@@ -111,6 +123,30 @@ collect:
 				if err != nil {
 					tc.Log(sp("get items error %v", err))
 					return Bad
+				}
+				// check page skip
+				noSales := true
+				for _, item := range items {
+					salesStr := item.View_sales
+					salesStr = strings.Replace(salesStr, "人收货", "", -1)
+					salesStr = strings.Replace(salesStr, "人付款", "", -1)
+					sales, err := strconv.Atoi(salesStr)
+					ce(err, sp("parse sales %s", item.View_sales))
+					if sales > 0 {
+						noSales = false
+					}
+				}
+				if noSales {
+					tc.Log("no sales")
+					skipPageLock.Lock()
+					if p, ok := skipPage[job.Cat]; ok {
+						if job.Page < p {
+							skipPage[job.Cat] = job.Page
+						}
+					} else {
+						skipPage[job.Cat] = job.Page
+					}
+					skipPageLock.Unlock()
 				}
 				// save
 				for {
