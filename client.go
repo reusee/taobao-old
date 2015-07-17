@@ -114,7 +114,15 @@ func (s *ClientSet) provideFreeProxyClients() {
 	entryPattern := regexp.MustCompile(`<tr><b><td>[0-9]+</td><td>([0-9.]+)</td><td>([0-9]+)</td>`)
 	for page := 1; page <= 10; page++ {
 		pageUrl := sp("http://www.proxy.com.ru/list_%d.html", page)
-		bs, err := getBytes(http.DefaultClient, pageUrl)
+		var bs []byte
+		var err error
+		s.Do(func(client *http.Client) ClientState {
+			bs, err = getBytes(client, pageUrl)
+			if err != nil {
+				return Bad
+			}
+			return Good
+		})
 		if err != nil {
 			pt("error getting %s\n", pageUrl)
 			continue
