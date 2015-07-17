@@ -67,7 +67,9 @@ collect:
 	if len(jobs) == 0 {
 		return
 	}
-	Jobs(jobs).Shuffle()
+	Jobs(jobs).Sort(func(a, b Job) bool {
+		return a.Page < b.Page
+	})
 	// skip following pages if all item has no sales.
 	skipPage := make(map[int]int)
 	skipPageLock := new(sync.Mutex)
@@ -85,17 +87,18 @@ collect:
 				atomic.AddInt64(&jobsDone, 1)
 				<-sem
 			}()
+			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
+			defer tc.SetFlag("done")
 			skipPageLock.Lock()
 			if p, ok := skipPage[job.Cat]; ok && job.Page > p {
 				// skip this page
-				tc.Log(sp("skip page after %d", p))
 				skipPageLock.Unlock()
+				tc.Log(sp("skip page after %d", p))
+				markDone(job)
 				return
 			}
 			skipPageLock.Unlock()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
-			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
-			defer tc.SetFlag("done")
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
 				if err != nil {

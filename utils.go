@@ -65,3 +65,19 @@ func init() {
 	binary.Read(crand.Reader, binary.LittleEndian, &seed)
 	rand.Seed(seed)
 }
+
+func (s Jobs) Sort(cmp func(a, b Job) bool) {
+	sorter := sliceSorter{
+		l: len(s),
+		less: func(i, j int) bool {
+			return cmp(s[i], s[j])
+		},
+		swap: func(i, j int) {
+			s[i], s[j] = s[j], s[i]
+		},
+	}
+	_ = sorter.Len
+	_ = sorter.Less
+	_ = sorter.Swap
+	sort.Sort(sorter)
+}
