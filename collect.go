@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-var MaxPage = 20
+var MaxPage = 100
 var jobTraceSet = NewTraceSet()
 
 func collect(backend Backend) {
@@ -66,6 +66,7 @@ collect:
 	if len(jobs) == 0 {
 		return
 	}
+	Jobs(jobs).Shuffle()
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
