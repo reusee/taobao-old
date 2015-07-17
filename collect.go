@@ -70,7 +70,6 @@ collect:
 	Jobs(jobs).Sort(func(a, b Job) bool {
 		return a.Page < b.Page
 	})
-	// skip following pages if all item has no sales.
 	skipPage := make(map[int]int)
 	skipPageLock := new(sync.Mutex)
 	var wg sync.WaitGroup
@@ -128,19 +127,17 @@ collect:
 					return Bad
 				}
 				// check page skip
-				noSales := true
+				sumSales := 0
 				for _, item := range items {
 					salesStr := item.View_sales
 					salesStr = strings.Replace(salesStr, "人收货", "", -1)
 					salesStr = strings.Replace(salesStr, "人付款", "", -1)
 					sales, err := strconv.Atoi(salesStr)
 					ce(err, sp("parse sales %s", item.View_sales))
-					if sales > 0 {
-						noSales = false
-					}
+					sumSales += sales
 				}
-				if noSales {
-					tc.Log("no sales")
+				if sumSales < 10 && job.Page > 20 {
+					tc.Log(sp("skip from page %d", job.Page))
 					skipPageLock.Lock()
 					if p, ok := skipPage[job.Cat]; ok {
 						if job.Page < p {
