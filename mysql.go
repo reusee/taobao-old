@@ -121,7 +121,7 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 	return
 }
 
-func (m *Mysql) AddCat(cat Cat) (err error) {
+func (m *Mysql) AddFgCat(cat Cat) (err error) {
 	tx, err := m.db.Begin()
 	ce(err, "start transaction")
 	_, err = tx.Exec(`INSERT INTO cats (cat, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?`,
@@ -136,7 +136,7 @@ func (m *Mysql) AddCat(cat Cat) (err error) {
 	return
 }
 
-func (m *Mysql) GetCats() (cats []Cat, err error) {
+func (m *Mysql) GetFgCats() (cats []Cat, err error) {
 	defer ct(&err)
 	rows, err := m.db.Query(`SELECT cat FROM cats`)
 	ce(err, "query")

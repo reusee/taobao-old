@@ -41,8 +41,8 @@ func main() {
 		collect(backend)
 	case "stats":
 		backend.Stats()
-	case "cats":
-		collectCategories(backend)
+	case "fgcats":
+		collectForegroundCategories(backend)
 	case "bgcats":
 		collectBackgroundCategories(backend)
 
@@ -52,12 +52,19 @@ func main() {
 }
 
 type Backend interface {
+	// jobs
 	AddJobs([]Job) error
 	DoneJob(Job) error
 	GetJobs() ([]Job, error)
+
+	// items
 	AddItems([]Item, Job) error
-	AddCat(Cat) error
-	GetCats() ([]Cat, error)
+
+	// fgcats
+	AddFgCat(Cat) error
+	GetFgCats() ([]Cat, error)
+
+	// bgcats
 	AddBgCat(Cat) error
 	GetBgCatInfo(int) (CatInfo, error)
 	SetBgCatInfo(int, CatInfo) error

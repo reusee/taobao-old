@@ -29,7 +29,7 @@ func collect(backend Backend) {
 
 	// first-page jobs
 	jobs := []Job{}
-	cats, err := backend.GetCats()
+	cats, err := backend.GetFgCats()
 	ce(err, "get cats")
 	for _, cat := range cats {
 		jobs = append(jobs, Job{

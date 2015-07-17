@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-func collectCategories(backend Backend) {
+func collectForegroundCategories(backend Backend) {
 	cats := make(map[int]Cat)
 	clientSet := NewClientSet()
 	var collectCategory func(Cat)
@@ -57,7 +57,7 @@ func collectCategories(backend Backend) {
 		})
 		if cat.Cat != 0 {
 			cats[cat.Cat] = cat
-			ce(backend.AddCat(cat), "add cat")
+			ce(backend.AddFgCat(cat), "add cat")
 		}
 
 		wg := new(sync.WaitGroup)
