@@ -4,26 +4,26 @@ func (m *Mysql) checkSchema() (err error) {
 	defer ct(&err)
 
 	_, err = m.db.Exec(sp(`CREATE TABLE IF NOT EXISTS jobs_%s (
-		cat BIGINT REFERENCES cats(cat),
+		cat BIGINT REFERENCES fgcats(cat),
 		page SMALLINT,
 		done BOOL NOT NULL DEFAULT false,
 		PRIMARY KEY (cat, page)
 	) ENGINE = TokuDB`, m.date))
 	ce(err, "create table jobs")
 
-	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cats (
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS fgcats (
 		cat BIGINT PRIMARY KEY,
 		name TEXT
 	) ENGINE = TokuDB`)
-	ce(err, "create table cats")
+	ce(err, "create table fgcats")
 
-	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cat_relatives (
-		cat BIGINT REFERENCES cats(cat),
-		rel BIGINT REFERENCES cats(cat),
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS fgcat_relatives (
+		cat BIGINT REFERENCES fgcats(cat),
+		rel BIGINT REFERENCES fgcats(cat),
 		PRIMARY KEY (cat, rel),
 		INDEX (rel)
 	) ENGINE = TokuDB`)
-	ce(err, "create table cat_relatives")
+	ce(err, "create table fgcat_relatives")
 
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS items (
 		nid BIGINT PRIMARY KEY,
@@ -53,26 +53,13 @@ func (m *Mysql) checkSchema() (err error) {
 	) ENGINE = TokuDB`)
 	ce(err, "create table item_stats")
 
-	/*
-		_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_sources (
-			date DATE,
-			nid BIGINT REFERENCES items(nid),
-			cat BIGINT REFERENCES cats(cat),
-			page SMALLINT,
-			PRIMARY KEY (date, nid, cat, page),
-			INDEX (nid),
-			INDEX (cat)
-		) ENGINE = TokuDB`)
-		ce(err, "create table item_sources")
-	*/
-
-	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_cats (
+	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS item_fgcats (
 		nid BIGINT REFERENCES items(nid),
-		cat BIGINT REFERENCES cats(cat),
+		cat BIGINT REFERENCES fgcats(cat),
 		PRIMARY KEY (nid, cat),
 		INDEX (cat)
 	) ENGINE = TokuDB`)
-	ce(err, "create table item_cats")
+	ce(err, "create table item_fgcats")
 
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS users (
 		id BIGINT PRIMARY KEY,
@@ -91,7 +78,7 @@ func (m *Mysql) checkSchema() (err error) {
 
 	_, err = m.db.Exec(`CREATE TABLE IF NOT EXISTS cat_stats (
 		date DATE,
-		cat BIGINT REFERENCES cats(cat),
+		cat BIGINT REFERENCES fgcats(cat),
 		sales BIGINT,
 		PRIMARY KEY (date, cat),
 		INDEX (cat),

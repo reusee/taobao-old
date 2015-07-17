@@ -114,9 +114,9 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 			m.date4mysql, nid, price, sales, comments, price, sales, comments)
 		ce(err, "insert item stats")
 		//item cats
-		_, err = m.db.Exec(`INSERT INTO item_cats (nid, cat)
+		_, err = m.db.Exec(`INSERT INTO item_fgcats (nid, cat)
 			VALUES (?, ?) ON DUPLICATE KEY UPDATE nid=nid`, nid, item.Category)
-		ce(err, "insert item cats")
+		ce(err, "insert item fgcats")
 	}
 	return
 }
@@ -124,11 +124,11 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 func (m *Mysql) AddFgCat(cat Cat) (err error) {
 	tx, err := m.db.Begin()
 	ce(err, "start transaction")
-	_, err = tx.Exec(`INSERT INTO cats (cat, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?`,
+	_, err = tx.Exec(`INSERT INTO fgcats (cat, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?`,
 		cat.Cat, cat.Name, cat.Name)
 	ce(err, "insert")
 	for _, rel := range cat.Relatives {
-		_, err = tx.Exec(`INSERT INTO cat_relatives (cat, rel) VALUES (?, ?) ON DUPLICATE KEY UPDATE cat=cat`,
+		_, err = tx.Exec(`INSERT INTO fgcat_relatives (cat, rel) VALUES (?, ?) ON DUPLICATE KEY UPDATE cat=cat`,
 			cat.Cat, rel)
 		ce(err, "insert")
 	}
@@ -138,7 +138,7 @@ func (m *Mysql) AddFgCat(cat Cat) (err error) {
 
 func (m *Mysql) GetFgCats() (cats []Cat, err error) {
 	defer ct(&err)
-	rows, err := m.db.Query(`SELECT cat FROM cats`)
+	rows, err := m.db.Query(`SELECT cat FROM fgcats`)
 	ce(err, "query")
 	for rows.Next() {
 		var cat Cat
@@ -177,7 +177,7 @@ func (m *Mysql) Stats() {
 	_, err := m.db.Exec(`REPLACE INTO cat_stats (date, cat, sales)
 		SELECT ?, cat, sum(sales) AS sales
 		FROM item_stats a
-		LEFT JOIN item_cats b
+		LEFT JOIN item_fgcats b
 		ON a.nid=b.nid
 		WHERE date = ?
 		GROUP BY cat
