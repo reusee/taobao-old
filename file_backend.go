@@ -74,7 +74,32 @@ func NewFileBackend() (b *FileBackend, err error) {
 		os.O_RDWR|os.O_CREATE, 0644)
 	ce(err, "open items file")
 	b.itemsFile = itemsFile
-	pt("checking items file\n")
+
+	err = b.scanItemsFile()
+	ce(err, "scan items file")
+
+	go func() {
+		t := time.NewTicker(time.Second*3 + time.Millisecond*500)
+		for {
+			select {
+			case <-t.C:
+				withLock(b.itemsLock, func() {
+					err := itemsFile.Sync()
+					ce(err, "sync items file")
+				})
+			case <-b.closed:
+				return
+			}
+		}
+	}()
+
+	return b, nil
+}
+
+func (b *FileBackend) scanItemsFile() (err error) {
+	defer ct(&err)
+	pt("scanning items file\n")
+	b.itemsFile.Seek(0, os.SEEK_SET)
 	doneJobs := 0
 	for {
 		var header EntryHeader
@@ -93,22 +118,6 @@ func NewFileBackend() (b *FileBackend, err error) {
 		doneJobs++
 	}
 	pt("items file is good, %d jobs done\n", doneJobs)
-	go func() {
-		t := time.NewTicker(time.Second*3 + time.Millisecond*500)
-		for {
-			select {
-			case <-t.C:
-				withLock(b.itemsLock, func() {
-					err := itemsFile.Sync()
-					ce(err, "sync items file")
-				})
-			case <-b.closed:
-				return
-			}
-		}
-	}()
-
-	return b, nil
 }
 
 func (b *FileBackend) Close() {
@@ -196,6 +205,9 @@ func (b *FileBackend) AddJobs(jobs []Job) error {
 }
 
 func (b *FileBackend) GetJobs() (jobs []Job, err error) {
+	defer ct(&err)
+	err = b.scanItemsFile()
+	ce(err, "scan items file")
 	withLock(b.jobsLock, func() {
 		for job, done := range b.jobs {
 			if done {
