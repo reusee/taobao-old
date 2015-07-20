@@ -30,6 +30,12 @@ type FileBackend struct {
 	closed chan struct{}
 }
 
+type EntryHeader struct {
+	Cat  uint64
+	Page uint8
+	Len  uint32
+}
+
 func NewFileBackend() (b *FileBackend, err error) {
 	defer ct(&err)
 	now := time.Now()
@@ -69,24 +75,33 @@ func NewFileBackend() (b *FileBackend, err error) {
 	ce(err, "open items file")
 	b.itemsFile = itemsFile
 	pt("checking items file\n")
+	doneJobs := 0
 	for {
-		var l uint32
-		err = binary.Read(itemsFile, binary.LittleEndian, &l)
+		var header EntryHeader
+		err = binary.Read(itemsFile, binary.LittleEndian, &header)
 		if err == io.EOF {
 			break
 		}
 		ce(err, "read entry len")
-		_, err = itemsFile.Seek(int64(l), os.SEEK_CUR)
+		_, err = itemsFile.Seek(int64(header.Len), os.SEEK_CUR)
 		ce(err, "seek entry")
+		job := Job{
+			Cat:  int(header.Cat),
+			Page: int(header.Page),
+		}
+		b.jobs[job] = true
+		doneJobs++
 	}
-	pt("items file is good\n")
+	pt("items file is good, %d jobs done\n", doneJobs)
 	go func() {
 		t := time.NewTicker(time.Second*3 + time.Millisecond*500)
 		for {
 			select {
 			case <-t.C:
-				err := itemsFile.Sync()
-				ce(err, "sync items file")
+				withLock(b.itemsLock, func() {
+					err := itemsFile.Sync()
+					ce(err, "sync items file")
+				})
 			case <-b.closed:
 				return
 			}
@@ -151,7 +166,12 @@ func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 	ce(err, "close write")
 	bs := buf.Bytes()
 	withLock(b.itemsLock, func() {
-		err = binary.Write(b.itemsFile, binary.LittleEndian, uint32(len(bs)))
+		header := EntryHeader{
+			Cat:  uint64(job.Cat),
+			Page: uint8(job.Page),
+			Len:  uint32(len(bs)),
+		}
+		err = binary.Write(b.itemsFile, binary.LittleEndian, header)
 		ce(err, "write items file entry header")
 		_, err = b.itemsFile.Write(bs)
 		ce(err, "write items entry")
@@ -188,13 +208,6 @@ func (b *FileBackend) GetJobs() (jobs []Job, err error) {
 }
 
 func (b *FileBackend) DoneJob(job Job) error {
-	withLock(b.jobsLock, func() {
-		job := Job{
-			Cat:  job.Cat,
-			Page: job.Page,
-		}
-		b.jobs[job] = true
-	})
 	return nil
 }
 
