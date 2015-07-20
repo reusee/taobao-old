@@ -33,17 +33,23 @@ func (b *FileBackend) Close() {
 }
 
 func (b *FileBackend) AddBgCat(cat Cat) error {
-	panic("not needed")
+	if true {
+		panic("not needed")
+	}
 	return nil
 }
 
 func (b *FileBackend) GetBgCatInfo(cat int) (info CatInfo, err error) {
-	panic("not needed")
+	if true {
+		panic("not needed")
+	}
 	return
 }
 
 func (b *FileBackend) SetBgCatInfo(cat int, info CatInfo) error {
-	panic("not needed")
+	if true {
+		panic("not needed")
+	}
 	return nil
 }
 
