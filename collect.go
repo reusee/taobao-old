@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-var MaxPage = 100
+var MaxPage = 20
 var jobTraceSet = NewTraceSet()
 
 func collect(backend Backend) {

@@ -26,15 +26,15 @@ func init() {
 }
 
 func main() {
+	backend, err := NewFileBackend()
+	ce(err, "new file backend")
+	defer backend.Close()
+
 	/*
-		backend, err := NewMongo()
+		backend, err := NewMysql()
 		ce(err, "new backend")
 		defer backend.Close()
 	*/
-
-	backend, err := NewMysql()
-	ce(err, "new backend")
-	defer backend.Close()
 
 	switch os.Args[1] {
 	case "collect":

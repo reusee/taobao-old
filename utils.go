@@ -81,3 +81,35 @@ func (s Jobs) Sort(cmp func(a, b Job) bool) {
 	_ = sorter.Swap
 	sort.Sort(sorter)
 }
+
+type StrSet map[string]struct{}
+
+func NewStrSet() StrSet {
+	return StrSet(make(map[string]struct{}))
+}
+
+func (s StrSet) Add(t string) {
+	s[t] = struct{}{}
+}
+
+func (s StrSet) Del(t string) {
+	delete(s, t)
+}
+
+func (s StrSet) Has(t string) (ok bool) {
+	_, ok = s[t]
+	return
+}
+
+func (s StrSet) Each(fn func(string)) {
+	for e := range s {
+		fn(e)
+	}
+}
+
+func (s StrSet) Slice() (ret []string) {
+	for e := range s {
+		ret = append(ret, e)
+	}
+	return
+}
