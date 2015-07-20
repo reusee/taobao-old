@@ -103,12 +103,12 @@ func (b *FileBackend) scanItemsFile() (err error) {
 	doneJobs := 0
 	for {
 		var header EntryHeader
-		err = binary.Read(itemsFile, binary.LittleEndian, &header)
+		err = binary.Read(b.itemsFile, binary.LittleEndian, &header)
 		if err == io.EOF {
 			break
 		}
 		ce(err, "read entry len")
-		_, err = itemsFile.Seek(int64(header.Len), os.SEEK_CUR)
+		_, err = b.itemsFile.Seek(int64(header.Len), os.SEEK_CUR)
 		ce(err, "seek entry")
 		job := Job{
 			Cat:  int(header.Cat),
@@ -118,6 +118,7 @@ func (b *FileBackend) scanItemsFile() (err error) {
 		doneJobs++
 	}
 	pt("items file is good, %d jobs done\n", doneJobs)
+	return
 }
 
 func (b *FileBackend) Close() {
