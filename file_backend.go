@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/binary"
-	"encoding/gob"
 	"io"
 	"os"
 	"path/filepath"
@@ -14,7 +13,10 @@ import (
 
 	"github.com/reusee/gobfile"
 	"github.com/reusee/jsonfile"
+	"github.com/ugorji/go/codec"
 )
+
+var codecHandle = new(codec.CborHandle)
 
 type FileBackend struct {
 	fgCats     StrSet
@@ -171,7 +173,7 @@ func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	buf := new(bytes.Buffer)
 	w := gzip.NewWriter(buf)
-	err = gob.NewEncoder(w).Encode(items)
+	err = codec.NewEncoder(w, codecHandle).Encode(items)
 	ce(err, "gob encode")
 	err = w.Close()
 	ce(err, "close write")
@@ -241,7 +243,7 @@ func (b *FileBackend) Foo() {
 		r, err := gzip.NewReader(bytes.NewReader(bs))
 		ce(err, "new gzip reader")
 		var items []Item
-		err = gob.NewDecoder(r).Decode(&items)
+		err = codec.NewDecoder(r, codecHandle).Decode(&items)
 		ce(err, "decode")
 		pt("%d\n", len(items))
 	}
