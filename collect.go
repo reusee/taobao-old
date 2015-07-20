@@ -42,8 +42,6 @@ func collect(backend Backend) {
 	ce(backend.AddJobs(jobs), "add jobs")
 
 	markDone := func(job Job) {
-		err := backend.AddItems(nil, job)
-		ce(err, "add nil items")
 		err = backend.DoneJob(job)
 		ce(err, "mark done")
 	}
@@ -96,6 +94,7 @@ collect:
 				skipPageLock.Unlock()
 				tc.Log(sp("skip page after %d", p))
 				markDone(job)
+				backend.AddItems(nil, job)
 				return
 			}
 			skipPageLock.Unlock()
@@ -120,6 +119,7 @@ collect:
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
 					tc.Log("no items found")
+					backend.AddItems(nil, job)
 					return Good
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
