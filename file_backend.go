@@ -199,6 +199,24 @@ func (b *FileBackend) DoneJob(job Job) error {
 }
 
 func (b *FileBackend) Foo() {
+	b.itemsFile.Seek(0, os.SEEK_SET)
+	for {
+		var l uint32
+		err := binary.Read(b.itemsFile, binary.LittleEndian, &l)
+		if err == io.EOF {
+			break
+		}
+		ce(err, "read length")
+		bs := make([]byte, l)
+		_, err = io.ReadFull(b.itemsFile, bs)
+		ce(err, "read data")
+		r, err := gzip.NewReader(bytes.NewReader(bs))
+		ce(err, "new gzip reader")
+		var items []Item
+		err = gob.NewDecoder(r).Decode(&items)
+		ce(err, "decode")
+		pt("%d\n", len(items))
+	}
 }
 
 func (b *FileBackend) Stats() {
