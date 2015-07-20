@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 )
@@ -112,4 +113,10 @@ func (s StrSet) Slice() (ret []string) {
 		ret = append(ret, e)
 	}
 	return
+}
+
+func withLock(l sync.Locker, fn func()) {
+	l.Lock()
+	fn()
+	l.Unlock()
 }

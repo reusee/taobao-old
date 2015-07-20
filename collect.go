@@ -76,7 +76,7 @@ collect:
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
 	jobsDone = 0
-	sem := make(chan struct{}, 128)
+	sem := make(chan struct{}, 256)
 	for _, job := range jobs {
 		job := job
 		sem <- struct{}{}
@@ -109,7 +109,6 @@ collect:
 					tc.Log(sp("get page config error %v", err))
 					return Bad
 				}
-				job.Data = jstr
 				var config PageConfig
 				if err := json.Unmarshal(jstr, &config); err != nil {
 					tc.Log(sp("unmarshal page config error %v", err))
@@ -149,13 +148,8 @@ collect:
 					skipPageLock.Unlock()
 				}
 				// save
-				for {
-					if err := backend.AddItems(items, job); err != nil {
-						pt("%v\n", err)
-						continue
-					}
-					break
-				}
+				err = backend.AddItems(items, job)
+				ce(err, "save items")
 				atomic.AddUint64(&itemsCount, uint64(len(items)))
 				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
 					markDone(job)
