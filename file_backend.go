@@ -214,13 +214,13 @@ func (b *FileBackend) DoneJob(job Job) error {
 func (b *FileBackend) Foo() {
 	b.itemsFile.Seek(0, os.SEEK_SET)
 	for {
-		var l uint32
-		err := binary.Read(b.itemsFile, binary.LittleEndian, &l)
+		var header EntryHeader
+		err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
 		if err == io.EOF {
 			break
 		}
 		ce(err, "read length")
-		bs := make([]byte, l)
+		bs := make([]byte, header.Len)
 		_, err = io.ReadFull(b.itemsFile, bs)
 		ce(err, "read data")
 		r, err := gzip.NewReader(bytes.NewReader(bs))
