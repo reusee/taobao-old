@@ -42,7 +42,9 @@ func collect(backend Backend) {
 	ce(backend.AddJobs(jobs), "add jobs")
 
 	markDone := func(job Job) {
-		err := backend.DoneJob(job)
+		err := backend.AddItems(nil, job)
+		ce(err, "add nil items")
+		err = backend.DoneJob(job)
 		ce(err, "mark done")
 	}
 
