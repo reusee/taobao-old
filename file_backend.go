@@ -105,6 +105,7 @@ func (b *FileBackend) scanItemsFile() (err error) {
 		var header EntryHeader
 		err = binary.Read(b.itemsFile, binary.LittleEndian, &header)
 		if err == io.EOF {
+			err = nil
 			break
 		}
 		ce(err, "read entry len")
@@ -230,6 +231,7 @@ func (b *FileBackend) Foo() {
 		var header EntryHeader
 		err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
 		if err == io.EOF {
+			err = nil
 			break
 		}
 		ce(err, "read length")
