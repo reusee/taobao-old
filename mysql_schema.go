@@ -1,4 +1,4 @@
-package main
+package taobao
 
 func (m *Mysql) checkSchema() (err error) {
 	defer ct(&err)

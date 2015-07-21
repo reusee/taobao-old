@@ -1,8 +1,9 @@
-package main
+package taobao
 
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,6 +16,12 @@ import (
 import "math/rand"
 
 import crand "crypto/rand"
+
+var (
+	pt = fmt.Printf
+	sp = fmt.Sprintf
+	fw = fmt.Fprintf
+)
 
 func dumpUrl(rawUrl string) {
 	u, err := url.Parse(rawUrl)

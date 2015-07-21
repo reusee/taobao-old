@@ -1,4 +1,4 @@
-package main
+package taobao
 
 import (
 	"bytes"
@@ -229,6 +229,8 @@ func (b *FileBackend) DoneJob(job Job) error {
 
 func (b *FileBackend) Foo() {
 	b.itemsFile.Seek(0, os.SEEK_SET)
+	n := 0
+	t0 := time.Now()
 	for {
 		var header EntryHeader
 		err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
@@ -245,7 +247,10 @@ func (b *FileBackend) Foo() {
 		var items []Item
 		err = codec.NewDecoder(r, codecHandle).Decode(&items)
 		ce(err, "decode")
-		pt("%d\n", len(items))
+		n++
+		if n%1000 == 0 {
+			pt("%d %v\n", n, time.Now().Sub(t0))
+		}
 	}
 }
 

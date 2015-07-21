@@ -1,4 +1,4 @@
-package main
+package taobao
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"sync"
 )
 
-func collectForegroundCategories(backend Backend) {
+func CollectForegroundCategories(backend Backend) {
 	cats := make(map[int]Cat)
 	clientSet := NewClientSet()
 	var collectCategory func(Cat)

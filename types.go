@@ -1,55 +1,8 @@
-package main
+package taobao
 
 import (
-	"fmt"
-	"os"
 	"time"
-
-	"net/http"
-	_ "net/http/pprof"
-
-	"github.com/reusee/hcutil"
 )
-
-var (
-	pt = fmt.Printf
-	sp = fmt.Sprintf
-	fw = fmt.Fprintf
-)
-
-func init() {
-	hcutil.DefaultRetryCount = 1
-	hcutil.DefaultRetryInterval = time.Millisecond * 200
-
-	web()
-	go http.ListenAndServe("127.0.0.1:9991", nil)
-}
-
-func main() {
-	backend, err := NewFileBackend()
-	ce(err, "new file backend")
-	defer backend.Close()
-
-	/*
-		backend, err := NewMysql()
-		ce(err, "new backend")
-		defer backend.Close()
-	*/
-
-	switch os.Args[1] {
-	case "collect":
-		collect(backend)
-	case "stats":
-		backend.Stats()
-	case "fgcats":
-		collectForegroundCategories(backend)
-	case "bgcats":
-		collectBackgroundCategories(backend)
-
-	case "foo":
-		backend.Foo()
-	}
-}
 
 type Backend interface {
 	// jobs

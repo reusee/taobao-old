@@ -1,8 +1,10 @@
-package main
+package taobao
 
 import (
 	"encoding/json"
 	"net/http"
+
+	_ "net/http/pprof"
 )
 
 type TraceInfo struct {
@@ -10,7 +12,7 @@ type TraceInfo struct {
 	Entries []*Entry
 }
 
-func web() {
+func StartWeb() {
 	http.Handle("/", http.FileServer(http.Dir("./web")))
 
 	http.HandleFunc("/jobs.json", func(w http.ResponseWriter, r *http.Request) {

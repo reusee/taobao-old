@@ -1,4 +1,4 @@
-package main
+package taobao
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"golang.org/x/text/transform"
 )
 
-func collectBackgroundCategories(backend Backend) {
+func CollectBackgroundCategories(backend Backend) {
 	//clientSet := NewClientSet()
 	//defer clientSet.Close()
 	//clientSet.Logger = backend.LogClient

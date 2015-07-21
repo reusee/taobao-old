@@ -1,4 +1,4 @@
-package main
+package taobao
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 var MaxPage = 100
 var jobTraceSet = NewTraceSet()
 
-func collect(backend Backend) {
+func Collect(backend Backend) {
 	if len(os.Args) > 2 {
 		page, err := strconv.Atoi(os.Args[2])
 		ce(err, "parse max page")
@@ -73,7 +73,7 @@ collect:
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
 	jobsDone = 0
-	sem := make(chan struct{}, 128)
+	sem := make(chan struct{}, 256)
 	for _, job := range jobs {
 		job := job
 		sem <- struct{}{}
