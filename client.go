@@ -79,7 +79,7 @@ loop:
 		client := <-s.out
 		s.Lock()
 		if _, ok := s.good[client]; !ok {
-			s.good[client] = 3
+			s.good[client] = 32
 		}
 		s.Unlock()
 		switch fn(client) {
