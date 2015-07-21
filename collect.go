@@ -7,13 +7,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-var MaxPage = 20
+var MaxPage = 100
 var jobTraceSet = NewTraceSet()
 
 func collect(backend Backend) {
@@ -70,8 +69,6 @@ collect:
 	Jobs(jobs).Sort(func(a, b Job) bool {
 		return a.Page < b.Page
 	})
-	skipPage := make(map[int]int)
-	skipPageLock := new(sync.Mutex)
 	var wg sync.WaitGroup
 	wg.Add(len(jobs))
 	jobsTotal = int64(len(jobs))
@@ -88,16 +85,6 @@ collect:
 			}()
 			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
 			defer tc.SetFlag("done")
-			skipPageLock.Lock()
-			if p, ok := skipPage[job.Cat]; ok && job.Page > p {
-				// skip this page
-				skipPageLock.Unlock()
-				tc.Log(sp("skip page after %d", p))
-				markDone(job)
-				backend.AddItems(nil, job)
-				return
-			}
-			skipPageLock.Unlock()
 			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 			clientSet.Do(func(client *http.Client) ClientState {
 				bs, err := getBytes(client, url)
@@ -126,28 +113,6 @@ collect:
 				if err != nil {
 					tc.Log(sp("get items error %v", err))
 					return Bad
-				}
-				// check page skip
-				sumSales := 0
-				for _, item := range items {
-					salesStr := item.View_sales
-					salesStr = strings.Replace(salesStr, "人收货", "", -1)
-					salesStr = strings.Replace(salesStr, "人付款", "", -1)
-					sales, err := strconv.Atoi(salesStr)
-					ce(err, sp("parse sales %s", item.View_sales))
-					sumSales += sales
-				}
-				if sumSales < 10 && job.Page > 20 {
-					tc.Log(sp("skip from page %d", job.Page))
-					skipPageLock.Lock()
-					if p, ok := skipPage[job.Cat]; ok {
-						if job.Page < p {
-							skipPage[job.Cat] = job.Page
-						}
-					} else {
-						skipPage[job.Cat] = job.Page
-					}
-					skipPageLock.Unlock()
 				}
 				// save
 				err = backend.AddItems(items, job)
