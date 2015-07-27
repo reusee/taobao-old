@@ -99,6 +99,7 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 func (b *FileBackend) scanItemsFile() (err error) {
 	defer ct(&err)
 	pt("scanning items file\n")
+	t0 := time.Now()
 	b.itemsFile.Seek(0, os.SEEK_SET)
 	doneJobs := 0
 	for {
@@ -118,7 +119,7 @@ func (b *FileBackend) scanItemsFile() (err error) {
 		b.jobs[job] = true
 		doneJobs++
 	}
-	pt("items file is good, %d jobs done\n", doneJobs)
+	pt("finish scanning in %v, %d jobs done\n", time.Now().Sub(t0), doneJobs)
 	return
 }
 
@@ -227,29 +228,54 @@ func (b *FileBackend) DoneJob(job Job) error {
 
 func (b *FileBackend) Foo() {
 	b.itemsFile.Seek(0, os.SEEK_SET)
-	n := 0
 	t0 := time.Now()
+	bss := make(chan *[]byte)
+
+	go func() {
+		for {
+			var header EntryHeader
+			err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
+			if err == io.EOF {
+				err = nil
+				break
+			}
+			ce(err, "read length")
+
+			bs := make([]byte, header.Len)
+			_, err = io.ReadFull(b.itemsFile, bs)
+			ce(err, "read data")
+			bss <- &bs
+
+		}
+		bss <- nil
+	}()
+
+	n := 0
+	sem := make(chan struct{}, 4)
+	wg := new(sync.WaitGroup)
 	for {
-		var header EntryHeader
-		err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
-		if err == io.EOF {
-			err = nil
+		bsp := <-bss
+		if bsp == nil {
 			break
 		}
-		ce(err, "read length")
-		bs := make([]byte, header.Len)
-		_, err = io.ReadFull(b.itemsFile, bs)
-		ce(err, "read data")
-		r, err := gzip.NewReader(bytes.NewReader(bs))
-		ce(err, "new gzip reader")
-		var items []Item
-		err = codec.NewDecoder(r, codecHandle).Decode(&items)
-		ce(err, "decode")
+		wg.Add(1)
+		sem <- struct{}{}
 		n++
 		if n%1000 == 0 {
 			pt("%d %v\n", n, time.Now().Sub(t0))
 		}
+		bs := *bsp
+		go func() {
+			r, err := gzip.NewReader(bytes.NewReader(bs))
+			ce(err, "new gzip reader")
+			var items []Item
+			err = codec.NewDecoder(r, codecHandle).Decode(&items)
+			ce(err, "decode")
+			<-sem
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 }
 
 func (b *FileBackend) Stats() {
