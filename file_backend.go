@@ -11,8 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/reusee/gobfile"
-	"github.com/reusee/jsonfile"
+	"github.com/reusee/dsfile"
 	"github.com/ugorji/go/codec"
 )
 
@@ -20,11 +19,11 @@ var codecHandle = new(codec.CborHandle)
 
 type FileBackend struct {
 	fgCats     StrSet
-	fgCatsFile *jsonfile.File
+	fgCatsFile *dsfile.File
 
 	jobs     map[Job]bool
 	jobsLock *sync.Mutex
-	jobsFile *gobfile.File
+	jobsFile *dsfile.File
 
 	itemsFile *os.File
 	itemsLock *sync.Mutex
@@ -48,14 +47,14 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 		closed: make(chan struct{}),
 	}
 
-	b.fgCatsFile, err = jsonfile.New(&b.fgCats, filepath.Join(dataDir, "fgcats"),
-		jsonfile.NewFileLocker(filepath.Join(dataDir, "fgcats.lock")))
+	b.fgCatsFile, err = dsfile.New(&b.fgCats, filepath.Join(dataDir, "fgcats"),
+		new(dsfile.Json), dsfile.NewFileLocker(filepath.Join(dataDir, "fgcats.lock")))
 	ce(err, "fgcats file")
 
 	b.jobs = make(map[Job]bool)
 	b.jobsLock = new(sync.Mutex)
-	b.jobsFile, err = gobfile.New(&b.jobs, filepath.Join(dataDir, sp("%s-jobs", date)),
-		gobfile.NewFileLocker(filepath.Join(dataDir, sp("%s-jobs.lock", date))))
+	b.jobsFile, err = dsfile.New(&b.jobs, filepath.Join(dataDir, sp("%s-jobs", date)),
+		new(dsfile.Gob), dsfile.NewFileLocker(filepath.Join(dataDir, sp("%s-jobs.lock", date))))
 	ce(err, "jobs file")
 	go func() {
 		t := time.NewTicker(time.Second * 3)
