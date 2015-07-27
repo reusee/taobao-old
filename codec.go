@@ -1752,7 +1752,7 @@ func (x *sliceSorter) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	r.ReadArrayEnd()
 }
 
-func (x *Item) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *RawItem) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer4788
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -2085,7 +2085,7 @@ func (x *Item) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *Item) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *RawItem) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer4788
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -2108,7 +2108,7 @@ func (x *Item) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *Item) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *RawItem) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer4788
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -2261,7 +2261,7 @@ func (x *Item) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	}
 }
 
-func (x *Item) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *RawItem) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer4788
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -2641,7 +2641,7 @@ func (x *Raw) CodecEncodeSelf(e *codec1978.Encoder) {
 			if x.Items == nil {
 				r.EncodeNil()
 			} else {
-				h.encSliceItem([]Item(x.Items), e)
+				h.encSliceItem([]RawItem(x.Items), e)
 			}
 		} else {
 			if yyfirst133 {
@@ -2656,7 +2656,7 @@ func (x *Raw) CodecEncodeSelf(e *codec1978.Encoder) {
 			if x.Items == nil {
 				r.EncodeNil()
 			} else {
-				h.encSliceItem([]Item(x.Items), e)
+				h.encSliceItem([]RawItem(x.Items), e)
 			}
 		}
 		if yyr133 || yy2arr133 {
@@ -2760,7 +2760,7 @@ func (x *Raw) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				x.Items = nil
 			} else {
 				yyv142 := &x.Items
-				h.decSliceItem((*[]Item)(yyv142), d)
+				h.decSliceItem((*[]RawItem)(yyv142), d)
 			}
 		case "Html":
 			if r.TryDecodeAsNil() {
@@ -2831,7 +2831,7 @@ func (x *Raw) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		x.Items = nil
 	} else {
 		yyv147 := &x.Items
-		h.decSliceItem((*[]Item)(yyv147), d)
+		h.decSliceItem((*[]RawItem)(yyv147), d)
 	}
 	yyj144++
 	if yyhl144 {
@@ -4560,7 +4560,7 @@ func (x codecSelfer4788) decTraces(v *Traces, d *codec1978.Decoder) {
 	}
 }
 
-func (x codecSelfer4788) encSliceItem(v []Item, e *codec1978.Encoder) {
+func (x codecSelfer4788) encSliceItem(v []RawItem, e *codec1978.Encoder) {
 	var h codecSelfer4788
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -4581,7 +4581,7 @@ func (x codecSelfer4788) encSliceItem(v []Item, e *codec1978.Encoder) {
 	}
 }
 
-func (x codecSelfer4788) decSliceItem(v *[]Item, d *codec1978.Decoder) {
+func (x codecSelfer4788) decSliceItem(v *[]RawItem, d *codec1978.Decoder) {
 	var h codecSelfer4788
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -4592,9 +4592,9 @@ func (x codecSelfer4788) decSliceItem(v *[]Item, d *codec1978.Decoder) {
 	var yyc233 bool
 	if yyv233 == nil {
 		if yyl233 <= 0 {
-			yyv233 = make([]Item, 0)
+			yyv233 = make([]RawItem, 0)
 		} else {
-			yyv233 = make([]Item, yyl233)
+			yyv233 = make([]RawItem, yyl233)
 		}
 		yyc233 = true
 	}
@@ -4608,7 +4608,7 @@ func (x codecSelfer4788) decSliceItem(v *[]Item, d *codec1978.Decoder) {
 
 		yyn233 := yyl233
 		if yyl233 > cap(yyv233) {
-			yyv233 = make([]Item, yyl233, yyl233)
+			yyv233 = make([]RawItem, yyl233, yyl233)
 			yyc233 = true
 
 		} else if yyl233 != len(yyv233) {
@@ -4618,7 +4618,7 @@ func (x codecSelfer4788) decSliceItem(v *[]Item, d *codec1978.Decoder) {
 		yyj233 := 0
 		for ; yyj233 < yyn233; yyj233++ {
 			if r.TryDecodeAsNil() {
-				yyv233[yyj233] = Item{}
+				yyv233[yyj233] = RawItem{}
 			} else {
 				yyv234 := &yyv233[yyj233]
 				yyv234.CodecDecodeSelf(d)
@@ -4629,7 +4629,7 @@ func (x codecSelfer4788) decSliceItem(v *[]Item, d *codec1978.Decoder) {
 	} else {
 		for yyj233 := 0; !r.CheckBreak(); yyj233++ {
 			if yyj233 >= len(yyv233) {
-				yyv233 = append(yyv233, Item{}) // var yyz233 Item
+				yyv233 = append(yyv233, RawItem{}) // var yyz233 Item
 				yyc233 = true
 			}
 			if yyj233 > 0 {
@@ -4638,7 +4638,7 @@ func (x codecSelfer4788) decSliceItem(v *[]Item, d *codec1978.Decoder) {
 
 			if yyj233 < len(yyv233) {
 				if r.TryDecodeAsNil() {
-					yyv233[yyj233] = Item{}
+					yyv233[yyj233] = RawItem{}
 				} else {
 					yyv235 := &yyv233[yyj233]
 					yyv235.CodecDecodeSelf(d)

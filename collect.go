@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -188,17 +190,74 @@ type PageConfig struct {
 	}
 }
 
-func GetItems(data []byte) ([]Item, error) {
+var ShopLevels = map[string]uint8{
+	"icon-supple-level-jinguan": 0,
+	"icon-supple-level-guan":    1,
+	"icon-supple-level-zuan":    2,
+	"icon-supple-level-xin":     3,
+}
+
+func GetItems(data []byte) (items []Item, err error) {
+	defer ct(&err)
 	var itemData struct {
 		PostFeeText, Trace          string
-		Auctions, RecommendAuctions []Item
+		Auctions, RecommendAuctions []RawItem
 		IsSameStyleView             bool
 		Sellers                     []interface{}
 		Query                       string
 	}
-	err := json.Unmarshal(data, &itemData)
-	if err != nil {
-		return nil, makeErr(err, "unmarshal")
+	err = json.Unmarshal(data, &itemData)
+	ce(err, "unmarshal")
+	for _, raw := range itemData.Auctions {
+		nid, err := strconv.Atoi(raw.Nid)
+		ce(err, "nid strconv")
+
+		cat, err := strconv.Atoi(raw.Category)
+		ce(err, "category strconv")
+
+		price := new(big.Rat)
+		_, err = fmt.Sscan(raw.View_price, price)
+		ce(err, "get price")
+
+		salesStr := raw.View_sales
+		salesStr = strings.Replace(salesStr, "人收货", "", -1)
+		salesStr = strings.Replace(salesStr, "人付款", "", -1)
+		sales, err := strconv.Atoi(salesStr)
+		ce(err, "get sales")
+
+		comments := 0
+		if len(raw.Comment_count) > 0 {
+			comments, err = strconv.Atoi(raw.Comment_count)
+			ce(err, "comments strconv")
+		}
+
+		seller, err := strconv.Atoi(raw.User_id)
+		ce(err, "get seller id")
+
+		var levels []uint8
+		for _, level := range raw.Shopcard.LevelClasses {
+			if _, ok := ShopLevels[level.LevelClass]; !ok {
+				panic(sp("%s not in ShopLevels", level.LevelClass))
+			}
+			levels = append(levels, ShopLevels[level.LevelClass])
+		}
+
+		item := Item{
+			Nid:               nid,
+			Category:          cat,
+			Title:             raw.Title,
+			Price:             price,
+			Location:          raw.Item_loc,
+			Sales:             sales,
+			Comments:          comments,
+			Seller:            seller,
+			SellerName:        raw.Nick,
+			SellerEncryptedId: raw.Shopcard.EncryptedUserId,
+			SellerLevels:      levels,
+			SellerIsTmall:     raw.Shopcard.IsTmall,
+			SellerCredit:      raw.Shopcard.SellerCredit,
+		}
+		items = append(items, item)
 	}
-	return itemData.Auctions, nil
+	return
 }

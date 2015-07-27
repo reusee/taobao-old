@@ -2,8 +2,6 @@ package taobao
 
 import (
 	"database/sql"
-	"strconv"
-	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -78,44 +76,29 @@ func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	for _, item := range items {
 		//user
-		uid, err := strconv.Atoi(item.User_id)
-		ce(err, sp("parse uid %s", item.User_id))
 		_, err = m.db.Exec(`INSERT INTO users (id, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name = ?`,
-			uid, item.Nick, item.Nick)
+			item.Seller, item.SellerName, item.SellerName)
 		ce(err, "insert user")
 		//shop
 		_, err = m.db.Exec(`INSERT INTO shops (id, is_tmall) VALUES (?, ?) ON DUPLICATE KEY UPDATE id=id`,
-			item.Shopcard.EncryptedUserId, item.Shopcard.IsTmall)
+			item.SellerEncryptedId, item.SellerEncryptedId)
 		ce(err, "insert shop")
 		//item
-		nid, err := strconv.Atoi(item.Nid)
-		ce(err, sp("parse nid %s", item.Nid))
 		_, err = m.db.Exec(`INSERT INTO items (
-			nid, title, pic_url, detail_url, comment_url, 
-			location, seller, shop) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nid=nid`,
-			nid, item.Title, item.Pic_url, item.Detail_url, item.Comment_url,
-			item.Item_loc, uid, item.Shopcard.EncryptedUserId)
+			nid, title, 
+			location, seller, shop) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nid=nid`,
+			item.Nid, item.Title,
+			item.Location, item.Seller, item.SellerEncryptedId)
 		ce(err, "insert item")
 		//item stats
-		price, err := strconv.ParseFloat(item.View_price, 64)
-		ce(err, sp("parse price %s", item.View_price))
-		salesStr := item.View_sales
-		salesStr = strings.Replace(salesStr, "人收货", "", -1)
-		salesStr = strings.Replace(salesStr, "人付款", "", -1)
-		sales, err := strconv.Atoi(salesStr)
-		ce(err, sp("parse sales %s", item.View_sales))
-		comments := 0
-		if len(item.Comment_count) > 0 {
-			comments, err = strconv.Atoi(item.Comment_count)
-		}
-		ce(err, sp("parse comment count %s", item.Comment_count))
+		price := item.Price.FloatString(3)
 		_, err = m.db.Exec(`INSERT INTO item_stats (
 			date, nid, price, sales, comments) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE price = ?, sales = ?, comments = ?`,
-			m.date4mysql, nid, price, sales, comments, price, sales, comments)
+			m.date4mysql, item.Nid, price, item.Sales, item.Comments, price, item.Sales, item.Comments)
 		ce(err, "insert item stats")
 		//item cats
 		_, err = m.db.Exec(`INSERT INTO item_fgcats (nid, cat)
-			VALUES (?, ?) ON DUPLICATE KEY UPDATE nid=nid`, nid, item.Category)
+			VALUES (?, ?) ON DUPLICATE KEY UPDATE nid=nid`, item.Nid, item.Category)
 		ce(err, "insert item fgcats")
 	}
 	return

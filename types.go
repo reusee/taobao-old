@@ -1,6 +1,7 @@
 package taobao
 
 import (
+	"math/big"
 	"time"
 )
 
@@ -28,7 +29,7 @@ type Backend interface {
 	LogClient(ClientInfo, ClientState)
 }
 
-type Item struct {
+type RawItem struct {
 	//I2iTags       map[string]interface{}
 	Nid           string
 	Category      string
@@ -62,9 +63,25 @@ type Item struct {
 	ShopLink    string
 }
 
+type Item struct {
+	Nid               int
+	Category          int
+	Title             string
+	Price             *big.Rat
+	Location          string
+	Sales             int
+	Comments          int
+	Seller            int
+	SellerEncryptedId string
+	SellerName        string
+	SellerLevels      []uint8
+	SellerIsTmall     bool
+	SellerCredit      int
+}
+
 type Raw struct {
 	Cat, Page int
-	Items     []Item
+	Items     []RawItem
 	Html      []byte
 }
 
