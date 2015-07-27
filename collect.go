@@ -49,11 +49,11 @@ func Collect(backend Backend) {
 
 	// status
 	var itemsCount uint64
-	var jobsTotal int64
-	var jobsDone int64
+	var jobsTotal, jobsDone, jobsCount int64
 	go func() {
 		for range time.NewTicker(time.Second * 3).C {
-			pt("%d / %d jobs done. %d items collected\n",
+			pt("%d / %d / %d jobs done. %d items collected\n",
+				atomic.SwapInt64(&jobsCount, 0),
 				atomic.LoadInt64(&jobsDone),
 				jobsTotal,
 				atomic.LoadUint64(&itemsCount))
@@ -83,6 +83,7 @@ collect:
 			defer func() {
 				wg.Done()
 				atomic.AddInt64(&jobsDone, 1)
+				atomic.AddInt64(&jobsCount, 1)
 				<-sem
 			}()
 			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
