@@ -29,8 +29,6 @@ type Backend interface {
 }
 
 type Item struct {
-	Sources []Source
-
 	//I2iTags       map[string]interface{}
 	Nid           string
 	Category      string
