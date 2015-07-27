@@ -38,9 +38,8 @@ type EntryHeader struct {
 	Len  uint32
 }
 
-func NewFileBackend() (b *FileBackend, err error) {
+func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	defer ct(&err)
-	now := time.Now()
 	date := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
 	dataDir := "data"
 

@@ -18,11 +18,15 @@ func init() {
 }
 
 func main() {
-	backend, err := taobao.NewFileBackend()
-	if err != nil {
-		panic(err)
+	var closeFunc func()
+	todayBackend := func() taobao.Backend {
+		backend, err := taobao.NewFileBackend(time.Now())
+		ce(err, "file backend")
+		closeFunc = func() {
+			backend.Close()
+		}
+		return backend
 	}
-	defer backend.Close()
 
 	/*
 		backend, err := NewMysql()
@@ -32,15 +36,29 @@ func main() {
 
 	switch os.Args[1] {
 	case "collect":
+		backend := todayBackend()
 		taobao.Collect(backend)
 	case "stats":
+		backend := todayBackend()
 		backend.Stats()
 	case "fgcats":
+		backend := todayBackend()
 		taobao.CollectForegroundCategories(backend)
 	case "bgcats":
+		backend := todayBackend()
 		taobao.CollectBackgroundCategories(backend)
 
 	case "foo":
+		now, err := time.Parse("2006-01-02", os.Args[2])
+		ce(err, "parse date")
+		pt("%v\n", now)
+		backend, err := taobao.NewFileBackend(now)
+		ce(err, "file backend")
+		closeFunc = func() {
+			backend.Close()
+		}
 		backend.Foo()
 	}
+
+	closeFunc()
 }
