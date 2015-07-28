@@ -7,6 +7,8 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+var _ Backend = new(Mysql)
+
 type Mysql struct {
 	db         *sql.DB
 	date       string
@@ -72,7 +74,7 @@ func (m *Mysql) GetJobs() (jobs []Job, err error) {
 	return jobs, nil
 }
 
-func (m *Mysql) AddItems(items []Item, job Job) (err error) {
+func (m *Mysql) AddItems(items []Item, meta ItemsMeta) (err error) {
 	defer ct(&err)
 	for _, item := range items {
 		//user

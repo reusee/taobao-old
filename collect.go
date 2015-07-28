@@ -109,7 +109,11 @@ collect:
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
 					tc.Log("no items found")
-					backend.AddItems([]Item{}, job)
+					backend.AddItems([]Item{}, ItemsMeta{
+						Cat:     job.Cat,
+						Page:    job.Page,
+						MaxPage: 0,
+					})
 					return Good
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
@@ -117,17 +121,11 @@ collect:
 					tc.Log(sp("get items error %v", err))
 					return Bad
 				}
-				// save
-				err = backend.AddItems(items, job)
-				ce(err, "save items")
-				atomic.AddUint64(&itemsCount, uint64(len(items)))
-				if config.Mods["pager"].Status == "hide" || job.Page > 0 {
-					markDone(job)
-					tc.Log("only one page")
-					return Good
-				}
+				// get max page
 				maxPage := MaxPage
-				// get pager data
+				if config.Mods["pager"].Status == "hide" {
+					maxPage = 0
+				}
 				var pagerData struct {
 					TotalPage  int
 					TotalCount int
@@ -139,6 +137,15 @@ collect:
 				if pagerData.TotalPage < maxPage {
 					maxPage = pagerData.TotalPage
 				}
+				// save items
+				err = backend.AddItems(items, ItemsMeta{
+					Cat:     job.Cat,
+					Page:    job.Page,
+					MaxPage: maxPage,
+				})
+				ce(err, "save items")
+				atomic.AddUint64(&itemsCount, uint64(len(items)))
+				// insert jobs
 				js := []Job{}
 				for i := 1; i < maxPage; i++ {
 					js = append(js, Job{

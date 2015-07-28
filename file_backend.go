@@ -15,6 +15,8 @@ import (
 	"github.com/ugorji/go/codec"
 )
 
+var _ Backend = new(FileBackend)
+
 var codecHandle = new(codec.CborHandle)
 
 type FileBackend struct {
@@ -32,9 +34,10 @@ type FileBackend struct {
 }
 
 type EntryHeader struct {
-	Cat  uint64
-	Page uint8
-	Len  uint32
+	Cat     uint64
+	Page    uint8
+	MaxPage uint8
+	Len     uint32
 }
 
 func NewFileBackend(now time.Time) (b *FileBackend, err error) {
@@ -168,7 +171,7 @@ func (b *FileBackend) GetFgCats() (cats []Cat, err error) {
 	return
 }
 
-func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
+func (b *FileBackend) AddItems(items []Item, meta ItemsMeta) (err error) {
 	defer ct(&err)
 	buf := new(bytes.Buffer)
 	w := gzip.NewWriter(buf)
@@ -179,9 +182,10 @@ func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 	bs := buf.Bytes()
 	withLock(b.itemsLock, func() {
 		header := EntryHeader{
-			Cat:  uint64(job.Cat),
-			Page: uint8(job.Page),
-			Len:  uint32(len(bs)),
+			Cat:     uint64(meta.Cat),
+			Page:    uint8(meta.Page),
+			MaxPage: uint8(meta.MaxPage),
+			Len:     uint32(len(bs)),
 		}
 		err = binary.Write(b.itemsFile, binary.LittleEndian, header)
 		ce(err, "write items file entry header")

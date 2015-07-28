@@ -12,7 +12,7 @@ type Backend interface {
 	GetJobs() ([]Job, error)
 
 	// items
-	AddItems([]Item, Job) error
+	AddItems([]Item, ItemsMeta) error
 
 	// fgcats
 	AddFgCat(Cat) error
@@ -77,6 +77,12 @@ type Item struct {
 	SellerLevels      []uint8
 	SellerIsTmall     bool
 	SellerCredit      int
+}
+
+type ItemsMeta struct {
+	Cat     int
+	Page    int
+	MaxPage int
 }
 
 type Raw struct {
