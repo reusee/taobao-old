@@ -109,7 +109,7 @@ collect:
 				if config.Mods["itemlist"].Status == "hide" { // no items
 					markDone(job)
 					tc.Log("no items found")
-					backend.AddItems(nil, job)
+					backend.AddItems([]Item{}, job)
 					return Good
 				}
 				items, err := GetItems(config.Mods["itemlist"].Data)
