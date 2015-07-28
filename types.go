@@ -6,13 +6,11 @@ import (
 )
 
 type Backend interface {
-	// jobs
-	AddJobs([]Job) error
-	DoneJob(Job) error
-	GetJobs() ([]Job, error)
+	// job
+	IsCollected(Job) bool
 
 	// items
-	AddItems([]Item, ItemsMeta) error
+	AddItems([]Item, Job) error
 
 	// fgcats
 	AddFgCat(Cat) error
@@ -77,12 +75,6 @@ type Item struct {
 	SellerLevels      []uint8
 	SellerIsTmall     bool
 	SellerCredit      int
-}
-
-type ItemsMeta struct {
-	Cat     int
-	Page    int
-	MaxPage int
 }
 
 type Raw struct {

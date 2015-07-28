@@ -7,7 +7,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-var _ Backend = new(Mysql)
+//var _ Backend = new(Mysql)
 
 type Mysql struct {
 	db         *sql.DB
@@ -40,41 +40,7 @@ func (m *Mysql) Close() {
 	m.db.Close()
 }
 
-func (m *Mysql) AddJobs(jobs []Job) (err error) {
-	defer ct(&err)
-	tx, err := m.db.Begin()
-	ce(err, "start transaction")
-	for _, job := range jobs {
-		_, err := tx.Exec(sp(`INSERT INTO jobs_%s (cat, page) VALUES (?, ?) ON DUPLICATE KEY UPDATE cat=cat`, m.date),
-			job.Cat, job.Page)
-		ce(err, "add job")
-	}
-	ce(tx.Commit(), "commit")
-	return
-}
-
-func (m *Mysql) DoneJob(job Job) error {
-	_, err := m.db.Exec(sp(`UPDATE jobs_%s SET done = true WHERE cat = ? AND page = ? LIMIT 1`, m.date),
-		job.Cat, job.Page)
-	return err
-}
-
-func (m *Mysql) GetJobs() (jobs []Job, err error) {
-	defer ct(&err)
-	rows, err := m.db.Query(sp(`SELECT cat, page FROM jobs_%s WHERE done = false`, m.date))
-	ce(err, "query")
-	for rows.Next() {
-		var job Job
-		err = rows.Scan(&job.Cat, &job.Page)
-		ce(err, "scan")
-		jobs = append(jobs, job)
-	}
-	err = rows.Err()
-	ce(err, "get rows")
-	return jobs, nil
-}
-
-func (m *Mysql) AddItems(items []Item, meta ItemsMeta) (err error) {
+func (m *Mysql) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	for _, item := range items {
 		//user

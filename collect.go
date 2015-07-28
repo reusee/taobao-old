@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,156 +14,111 @@ import (
 	"time"
 )
 
-var MaxPage = 100
 var jobTraceSet = NewTraceSet()
 
 func Collect(backend Backend) {
-	if len(os.Args) > 2 {
-		page, err := strconv.Atoi(os.Args[2])
-		ce(err, "parse max page")
-		MaxPage = page
-	}
-
 	// client set
 	clientSet := NewClientSet()
 	defer clientSet.Close()
 	clientSet.Logger = backend.LogClient
 
-	// first-page jobs
-	jobs := []Job{}
-	cats, err := backend.GetFgCats()
-	ce(err, "get cats")
-	for _, cat := range cats {
-		jobs = append(jobs, Job{
-			Cat:  cat.Cat,
-			Page: 0,
-			Done: false,
-		})
-	}
-	ce(backend.AddJobs(jobs), "add jobs")
-
-	markDone := func(job Job) {
-		err = backend.DoneJob(job)
-		ce(err, "mark done")
+	// first pass
+	cats := []int{}
+	fgcats, err := backend.GetFgCats()
+	ce(err, "get fgcats")
+	for _, cat := range fgcats {
+		cats = append(cats, cat.Cat)
 	}
 
-	// status
-	var itemsCount uint64
-	var jobsTotal, jobsDone, jobsCount int64
-	go func() {
-		for range time.NewTicker(time.Second * 3).C {
-			pt("%d / %d / %d jobs done. %d items collected\n",
-				atomic.SwapInt64(&jobsCount, 0),
-				atomic.LoadInt64(&jobsDone),
-				jobsTotal,
-				atomic.LoadUint64(&itemsCount))
-		}
-	}()
-
-	// collect
-collect:
-	jobs, err = backend.GetJobs()
-	ce(err, "get jobs")
-	pt("%d jobs\n", len(jobs))
-	if len(jobs) == 0 {
-		return
-	}
-	Jobs(jobs).Sort(func(a, b Job) bool {
-		return a.Page < b.Page
-	})
-	var wg sync.WaitGroup
-	wg.Add(len(jobs))
-	jobsTotal = int64(len(jobs))
-	jobsDone = 0
-	sem := make(chan struct{}, 256)
-	for _, job := range jobs {
-		job := job
-		sem <- struct{}{}
+	for page := 0; page < 100; page++ {
+		sort.Ints(cats)
+		wg := new(sync.WaitGroup)
+		wg.Add(len(cats))
+		sem := make(chan struct{}, 256)
+		nextPassCats := []int{}
+		done := make(chan struct{})
+		var c1, c2 uint64
 		go func() {
-			defer func() {
-				wg.Done()
-				atomic.AddInt64(&jobsDone, 1)
-				atomic.AddInt64(&jobsCount, 1)
-				<-sem
-			}()
-			tc := jobTraceSet.NewTrace(sp("job %d %d", job.Cat, job.Page))
-			defer tc.SetFlag("done")
-			url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
-			clientSet.Do(func(client *http.Client) ClientState {
-				bs, err := getBytes(client, url)
-				if err != nil {
-					tc.Log(sp("get bytes error %v", err))
-					return Bad
+			ticker := time.NewTicker(time.Second * 5)
+			for {
+				select {
+				case <-ticker.C:
+					pt("%d - %d / %d / %d\n", page, atomic.SwapUint64(&c1, 0), atomic.LoadUint64(&c2), len(cats))
+				case <-done:
+					return
 				}
-				jstr, err := GetPageConfigJson(bs)
-				if err != nil {
-					tc.Log(sp("get page config error %v", err))
-					return Bad
-				}
-				var config PageConfig
-				if err := json.Unmarshal(jstr, &config); err != nil {
-					tc.Log(sp("unmarshal page config error %v", err))
-					return Bad
-				}
-				// get items
-				if config.Mods["itemlist"].Status == "hide" { // no items
-					markDone(job)
-					tc.Log("no items found")
-					backend.AddItems([]Item{}, ItemsMeta{
-						Cat:     job.Cat,
-						Page:    job.Page,
-						MaxPage: 0,
-					})
-					return Good
-				}
-				items, err := GetItems(config.Mods["itemlist"].Data)
-				if err != nil {
-					tc.Log(sp("get items error %v", err))
-					return Bad
-				}
-				// get max page
-				maxPage := MaxPage
-				if config.Mods["pager"].Status == "hide" {
-					maxPage = 0
-				}
-				var pagerData struct {
-					TotalPage  int
-					TotalCount int
-				}
-				if err := json.Unmarshal(config.Mods["pager"].Data, &pagerData); err != nil {
-					tc.Log(sp("unmarshal mod pager error %v", err))
-					return Bad
-				}
-				if pagerData.TotalPage < maxPage {
-					maxPage = pagerData.TotalPage
-				}
-				// save items
-				err = backend.AddItems(items, ItemsMeta{
-					Cat:     job.Cat,
-					Page:    job.Page,
-					MaxPage: maxPage,
-				})
-				ce(err, "save items")
-				atomic.AddUint64(&itemsCount, uint64(len(items)))
-				// insert jobs
-				js := []Job{}
-				for i := 1; i < maxPage; i++ {
-					js = append(js, Job{
-						Cat:  job.Cat,
-						Page: i,
-						Done: false,
-					})
-				}
-				ce(backend.AddJobs(js), "add jobs")
-				markDone(job)
-				tc.Log(sp("add %d jobs", len(js)))
-				return Good
-			})
+			}
 		}()
+		for _, cat := range cats {
+			sem <- struct{}{}
+			cat := cat
+			go func() {
+				defer func() {
+					wg.Done()
+					atomic.AddUint64(&c1, 1)
+					atomic.AddUint64(&c2, 1)
+					<-sem
+				}()
+				// check
+				if backend.IsCollected(Job{
+					Cat:  cat,
+					Page: page,
+				}) {
+					return
+				}
+				// trace
+				tc := jobTraceSet.NewTrace(sp("cat %d, page %d", cat, page))
+				defer tc.SetFlag("done")
+				url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", cat, page*60)
+				clientSet.Do(func(client *http.Client) ClientState {
+					bs, err := getBytes(client, url)
+					if err != nil {
+						tc.Log(sp("get bytes error %v", err))
+						return Bad
+					}
+					jstr, err := GetPageConfigJson(bs)
+					if err != nil {
+						tc.Log(sp("get page config error %v", err))
+						return Bad
+					}
+					var config PageConfig
+					if err := json.Unmarshal(jstr, &config); err != nil {
+						tc.Log(sp("unmarshal page config error %v", err))
+						return Bad
+					}
+					// get items
+					if config.Mods["itemlist"].Status == "hide" { // no items
+						tc.Log("no items found")
+						backend.AddItems([]Item{}, Job{
+							Cat:  cat,
+							Page: page,
+						})
+						return Good
+					}
+					items, err := GetItems(config.Mods["itemlist"].Data)
+					if err != nil {
+						tc.Log(sp("get items error %v", err))
+						return Bad
+					}
+					// save items
+					err = backend.AddItems(items, Job{
+						Cat:  cat,
+						Page: page,
+					})
+					ce(err, "save items")
+					// add next pass cat
+					if len(items) > 0 {
+						nextPassCats = append(nextPassCats, cat)
+					}
+					return Good
+				})
+			}()
+		}
+		wg.Wait()
+		pt("page %d collected\n", page)
+		close(done)
+		cats = nextPassCats
 	}
-	wg.Wait()
-	goto collect
-
 }
 
 func GetPageConfigJson(content []byte) ([]byte, error) {

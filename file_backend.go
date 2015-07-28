@@ -23,9 +23,7 @@ type FileBackend struct {
 	fgCats     StrSet
 	fgCatsFile *dsfile.File
 
-	jobs     map[Job]bool
-	jobsLock *sync.Mutex
-	jobsFile *dsfile.File
+	collected map[Job]bool
 
 	itemsFile *os.File
 	itemsLock *sync.Mutex
@@ -34,10 +32,9 @@ type FileBackend struct {
 }
 
 type EntryHeader struct {
-	Cat     uint64
-	Page    uint8
-	MaxPage uint8
-	Len     uint32
+	Cat  uint64
+	Page uint8
+	Len  uint32
 }
 
 func NewFileBackend(now time.Time) (b *FileBackend, err error) {
@@ -46,31 +43,14 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	dataDir := "data"
 
 	b = &FileBackend{
-		fgCats: NewStrSet(),
-		closed: make(chan struct{}),
+		fgCats:    NewStrSet(),
+		closed:    make(chan struct{}),
+		collected: make(map[Job]bool),
 	}
 
 	b.fgCatsFile, err = dsfile.New(&b.fgCats, filepath.Join(dataDir, "fgcats"),
 		new(dsfile.Json), dsfile.NewFileLocker(filepath.Join(dataDir, "fgcats.lock")))
 	ce(err, "fgcats file")
-
-	b.jobs = make(map[Job]bool)
-	b.jobsLock = new(sync.Mutex)
-	b.jobsFile, err = dsfile.New(&b.jobs, filepath.Join(dataDir, sp("%s-jobs", date)),
-		new(dsfile.Gob), dsfile.NewFileLocker(filepath.Join(dataDir, sp("%s-jobs.lock", date))))
-	ce(err, "jobs file")
-	go func() {
-		t := time.NewTicker(time.Second * 3)
-		for {
-			select {
-			case <-t.C:
-				err := b.jobsFile.Save()
-				ce(err, "save jobs file")
-			case <-b.closed:
-				return
-			}
-		}
-	}()
 
 	b.itemsLock = new(sync.Mutex)
 	itemsFile, err := os.OpenFile(filepath.Join(dataDir, sp("%s-items", date)),
@@ -119,7 +99,7 @@ func (b *FileBackend) scanItemsFile() (err error) {
 			Cat:  int(header.Cat),
 			Page: int(header.Page),
 		}
-		b.jobs[job] = true
+		b.collected[job] = true
 		doneJobs++
 	}
 	pt("finish scanning in %v, %d jobs done\n", time.Now().Sub(t0), doneJobs)
@@ -128,7 +108,6 @@ func (b *FileBackend) scanItemsFile() (err error) {
 
 func (b *FileBackend) Close() {
 	b.fgCatsFile.Close()
-	b.jobsFile.Close()
 	b.itemsFile.Close()
 }
 
@@ -171,7 +150,7 @@ func (b *FileBackend) GetFgCats() (cats []Cat, err error) {
 	return
 }
 
-func (b *FileBackend) AddItems(items []Item, meta ItemsMeta) (err error) {
+func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	buf := new(bytes.Buffer)
 	w := gzip.NewWriter(buf)
@@ -182,10 +161,9 @@ func (b *FileBackend) AddItems(items []Item, meta ItemsMeta) (err error) {
 	bs := buf.Bytes()
 	withLock(b.itemsLock, func() {
 		header := EntryHeader{
-			Cat:     uint64(meta.Cat),
-			Page:    uint8(meta.Page),
-			MaxPage: uint8(meta.MaxPage),
-			Len:     uint32(len(bs)),
+			Cat:  uint64(job.Cat),
+			Page: uint8(job.Page),
+			Len:  uint32(len(bs)),
 		}
 		err = binary.Write(b.itemsFile, binary.LittleEndian, header)
 		ce(err, "write items file entry header")
@@ -195,39 +173,8 @@ func (b *FileBackend) AddItems(items []Item, meta ItemsMeta) (err error) {
 	return nil
 }
 
-func (b *FileBackend) AddJobs(jobs []Job) error {
-	for _, job := range jobs {
-		job = Job{ // make it a key
-			Cat:  job.Cat,
-			Page: job.Page,
-		}
-		withLock(b.jobsLock, func() {
-			if _, ok := b.jobs[job]; ok { // exists
-				return
-			}
-			b.jobs[job] = false
-		})
-	}
-	return nil
-}
-
-func (b *FileBackend) GetJobs() (jobs []Job, err error) {
-	defer ct(&err)
-	err = b.scanItemsFile()
-	ce(err, "scan items file")
-	withLock(b.jobsLock, func() {
-		for job, done := range b.jobs {
-			if done {
-				continue
-			}
-			jobs = append(jobs, job)
-		}
-	})
-	return
-}
-
-func (b *FileBackend) DoneJob(job Job) error {
-	return nil
+func (b *FileBackend) IsCollected(job Job) bool {
+	return b.collected[job]
 }
 
 func (b *FileBackend) Foo() {
