@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,38 +21,36 @@ func Collect(backend Backend) {
 	defer clientSet.Close()
 	clientSet.Logger = backend.LogClient
 
-	// first pass
-	cats := []int{}
+	jobsIn, jobsOut, jobsClose := NewJobsChan()
+	defer close(jobsClose)
+	wg := new(sync.WaitGroup)
+
 	fgcats, err := backend.GetFgCats()
 	ce(err, "get fgcats")
-	for _, cat := range fgcats {
-		cats = append(cats, cat.Cat)
-	}
-	pt("%d fgcats\n", len(cats))
-
-	for page := 0; page < 100; page++ {
-		sort.Ints(cats)
-		wg := new(sync.WaitGroup)
-		wg.Add(len(cats))
-		sem := make(chan struct{}, 256)
-		nextPassCats := []int{}
-		lock := new(sync.Mutex)
-		done := make(chan struct{})
-		var c1, c2 uint64
-		go func() {
-			ticker := time.NewTicker(time.Second * 5)
-			for {
-				select {
-				case <-ticker.C:
-					pt("%d - %d / %d / %d\n", page, atomic.SwapUint64(&c1, 0), atomic.LoadUint64(&c2), len(cats))
-				case <-done:
-					return
-				}
+	wg.Add(len(fgcats))
+	go func() {
+		for _, cat := range fgcats {
+			jobsIn <- Job{
+				Cat:  cat.Cat,
+				Page: 0,
 			}
-		}()
-		for _, cat := range cats {
+		}
+	}()
+
+	var c1, c2 uint64
+	go func() {
+		ticker := time.NewTicker(time.Second * 5)
+		t0 := time.Now()
+		for range ticker.C {
+			pt("%d / %d - %v\n", atomic.SwapUint64(&c1, 0), atomic.LoadUint64(&c2), time.Now().Sub(t0))
+		}
+	}()
+
+	go func() {
+		sem := make(chan struct{}, 256)
+		for {
+			job := <-jobsOut
 			sem <- struct{}{}
-			cat := cat
 			go func() {
 				defer func() {
 					wg.Done()
@@ -62,19 +59,19 @@ func Collect(backend Backend) {
 					<-sem
 				}()
 				// check
-				if backend.IsCollected(Job{
-					Cat:  cat,
-					Page: page,
-				}) {
-					withLock(lock, func() {
-						nextPassCats = append(nextPassCats, cat)
-					})
+				if backend.IsCollected(job) {
+					wg.Add(1)
+					jobsIn <- Job{
+						Cat:  job.Cat,
+						Page: job.Page + 1,
+					}
 					return
 				}
 				// trace
-				tc := jobTraceSet.NewTrace(sp("cat %d, page %d", cat, page))
+				tc := jobTraceSet.NewTrace(sp("cat %d, page %d", job.Cat, job.Page))
 				defer tc.SetFlag("done")
-				url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", cat, page*60)
+				// collect
+				url := sp("http://s.taobao.com/list?cat=%d&sort=sale-desc&bcoffset=0&s=%d", job.Cat, job.Page*60)
 				clientSet.Do(func(client *http.Client) ClientState {
 					bs, err := getBytes(client, url)
 					if err != nil {
@@ -95,8 +92,8 @@ func Collect(backend Backend) {
 					if config.Mods["itemlist"].Status == "hide" { // no items
 						tc.Log("no items found")
 						backend.AddItems([]Item{}, Job{
-							Cat:  cat,
-							Page: page,
+							Cat:  job.Cat,
+							Page: job.Page,
 						})
 						return Good
 					}
@@ -107,25 +104,25 @@ func Collect(backend Backend) {
 					}
 					// save items
 					err = backend.AddItems(items, Job{
-						Cat:  cat,
-						Page: page,
+						Cat:  job.Cat,
+						Page: job.Page,
 					})
 					ce(err, "save items")
 					// add next pass cat
-					if len(items) > 0 {
-						withLock(lock, func() {
-							nextPassCats = append(nextPassCats, cat)
-						})
+					if len(items) > 0 && job.Page < 99 {
+						wg.Add(1)
+						jobsIn <- Job{
+							Cat:  job.Cat,
+							Page: job.Page + 1,
+						}
 					}
 					return Good
 				})
 			}()
 		}
-		wg.Wait()
-		pt("page %d collected\n", page)
-		close(done)
-		cats = nextPassCats
-	}
+	}()
+
+	wg.Wait()
 }
 
 func GetPageConfigJson(content []byte) ([]byte, error) {
