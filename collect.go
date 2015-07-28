@@ -29,6 +29,7 @@ func Collect(backend Backend) {
 	for _, cat := range fgcats {
 		cats = append(cats, cat.Cat)
 	}
+	pt("%d fgcats\n", len(cats))
 
 	for page := 0; page < 100; page++ {
 		sort.Ints(cats)
@@ -36,6 +37,7 @@ func Collect(backend Backend) {
 		wg.Add(len(cats))
 		sem := make(chan struct{}, 256)
 		nextPassCats := []int{}
+		lock := new(sync.Mutex)
 		done := make(chan struct{})
 		var c1, c2 uint64
 		go func() {
@@ -64,6 +66,9 @@ func Collect(backend Backend) {
 					Cat:  cat,
 					Page: page,
 				}) {
+					withLock(lock, func() {
+						nextPassCats = append(nextPassCats, cat)
+					})
 					return
 				}
 				// trace
@@ -108,7 +113,9 @@ func Collect(backend Backend) {
 					ce(err, "save items")
 					// add next pass cat
 					if len(items) > 0 {
-						nextPassCats = append(nextPassCats, cat)
+						withLock(lock, func() {
+							nextPassCats = append(nextPassCats, cat)
+						})
 					}
 					return Good
 				})
