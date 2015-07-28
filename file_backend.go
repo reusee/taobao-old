@@ -54,7 +54,7 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	b.jobs = make(map[Job]bool)
 	b.jobsLock = new(sync.Mutex)
 	b.jobsFile, err = dsfile.New(&b.jobs, filepath.Join(dataDir, sp("%s-jobs", date)),
-		new(dsfile.Cbor), dsfile.NewFileLocker(filepath.Join(dataDir, sp("%s-jobs.lock", date))))
+		new(dsfile.Gob), dsfile.NewFileLocker(filepath.Join(dataDir, sp("%s-jobs.lock", date))))
 	ce(err, "jobs file")
 	go func() {
 		t := time.NewTicker(time.Second * 3)
