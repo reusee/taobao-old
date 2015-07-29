@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -202,7 +203,7 @@ func (b *FileBackend) Foo() {
 	}()
 
 	n := 0
-	sem := make(chan struct{}, 4)
+	sem := make(chan struct{}, runtime.NumCPU())
 	wg := new(sync.WaitGroup)
 	for {
 		bsp := <-bss
