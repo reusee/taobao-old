@@ -29,9 +29,9 @@ func CollectBackgroundCategories(backend Backend) {
 		if sid != "" {
 			cat, err := strconv.Atoi(sid)
 			ce(err, "strconv")
-			info, err := backend.GetBgCatInfo(cat)
-			ce(err, "get info")
-			if time.Now().Sub(info.LastChecked) < time.Hour*24*5 {
+			t, err := backend.GetBgCatLastUpdated(cat)
+			ce(err, "get last updated time")
+			if time.Now().Sub(t) < time.Hour*24*5 {
 				pt("skip %d\n", cat)
 				return
 			}
@@ -91,10 +91,8 @@ func CollectBackgroundCategories(backend Backend) {
 
 		cat, err := strconv.Atoi(sid)
 		ce(err, "strconv")
-		err = backend.SetBgCatInfo(cat, CatInfo{
-			LastChecked: time.Now(),
-		})
-		ce(err, "set bgcat info")
+		err = backend.SetBgCatLastUpdated(cat, time.Now())
+		ce(err, "set bgcat last updated")
 		return
 	}
 	collect("all", "")

@@ -18,8 +18,8 @@ type Backend interface {
 
 	// bgcats
 	AddBgCat(Cat) error
-	GetBgCatInfo(int) (CatInfo, error)
-	SetBgCatInfo(int, CatInfo) error
+	GetBgCatLastUpdated(int) (time.Time, error)
+	SetBgCatLastUpdated(int, time.Time) error
 
 	Stats()
 	Foo()
@@ -97,10 +97,6 @@ type Cat struct {
 	Name      string
 	Relatives []int
 	Parent    int
-}
-
-type CatInfo struct {
-	LastChecked time.Time
 }
 
 type NavData struct {

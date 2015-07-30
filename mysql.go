@@ -108,9 +108,9 @@ func (m *Mysql) AddBgCat(cat Cat) (err error) {
 	return
 }
 
-func (m *Mysql) GetBgCatInfo(cat int) (info CatInfo, err error) {
+func (m *Mysql) GetBgCatLastUpdated(cat int) (t time.Time, err error) {
 	err = m.db.QueryRow(`SELECT last_checked FROM bgcats_info WHERE cat = ?`, cat).Scan(
-		&info.LastChecked)
+		&t)
 	switch {
 	case err == sql.ErrNoRows:
 		err = nil
@@ -118,9 +118,9 @@ func (m *Mysql) GetBgCatInfo(cat int) (info CatInfo, err error) {
 	return
 }
 
-func (m *Mysql) SetBgCatInfo(cat int, info CatInfo) (err error) {
+func (m *Mysql) SetBgCatLastUpdated(cat int, t time.Time) (err error) {
 	_, err = m.db.Exec(`REPLACE INTO bgcats_info (cat, last_checked) VALUES (?, ?)`,
-		cat, info.LastChecked)
+		cat, t)
 	return
 }
 

@@ -119,14 +119,14 @@ func (b *FileBackend) AddBgCat(cat Cat) error {
 	return nil
 }
 
-func (b *FileBackend) GetBgCatInfo(cat int) (info CatInfo, err error) {
+func (b *FileBackend) GetBgCatLastUpdated(cat int) (t time.Time, err error) {
 	if true {
 		panic("not needed")
 	}
 	return
 }
 
-func (b *FileBackend) SetBgCatInfo(cat int, info CatInfo) error {
+func (b *FileBackend) SetBgCatLastUpdated(cat int, t time.Time) error {
 	if true {
 		panic("not needed")
 	}
@@ -180,9 +180,9 @@ func (b *FileBackend) IsCollected(job Job) bool {
 
 func (b *FileBackend) Foo() {
 	b.itemsFile.Seek(0, os.SEEK_SET)
-	t0 := time.Now()
 	bss := make(chan *[]byte)
 
+	// read entries
 	go func() {
 		for {
 			var header EntryHeader
@@ -192,42 +192,64 @@ func (b *FileBackend) Foo() {
 				break
 			}
 			ce(err, "read length")
-
 			bs := make([]byte, header.Len)
 			_, err = io.ReadFull(b.itemsFile, bs)
 			ce(err, "read data")
 			bss <- &bs
-
 		}
 		bss <- nil
 	}()
 
-	n := 0
-	sem := make(chan struct{}, runtime.NumCPU())
-	wg := new(sync.WaitGroup)
+	// decode
+	itemsChan := make(chan *[]Item, 200000)
+	go func() {
+		sem := make(chan struct{}, runtime.NumCPU())
+		wg := new(sync.WaitGroup)
+		for {
+			bsp := <-bss
+			if bsp == nil {
+				break
+			}
+			wg.Add(1)
+			sem <- struct{}{}
+			bs := *bsp
+			go func() {
+				r, err := gzip.NewReader(bytes.NewReader(bs))
+				ce(err, "new gzip reader")
+				var items []Item
+				err = codec.NewDecoder(r, codecHandle).Decode(&items)
+				ce(err, "decode")
+				itemsChan <- &items
+				<-sem
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+		itemsChan <- nil
+	}()
+
+	// process
+	var itemIdSet [1000]IntSet
+	for i := 0; i < 1000; i++ {
+		itemIdSet[i] = NewIntSet()
+	}
+	catSum := make(map[int]int)
 	for {
-		bsp := <-bss
-		if bsp == nil {
+		items := <-itemsChan
+		if items == nil {
 			break
 		}
-		wg.Add(1)
-		sem <- struct{}{}
-		n++
-		if n%1000 == 0 {
-			pt("%d %v\n", n, time.Now().Sub(t0))
+		for _, item := range *items {
+			// dedup
+			slot := item.Nid % 1000
+			if itemIdSet[slot].Has(item.Nid) {
+				continue
+			}
+			itemIdSet[slot].Add(item.Nid)
+			// cat
+			catSum[item.Category] += item.Sales
 		}
-		bs := *bsp
-		go func() {
-			r, err := gzip.NewReader(bytes.NewReader(bs))
-			ce(err, "new gzip reader")
-			var items []Item
-			err = codec.NewDecoder(r, codecHandle).Decode(&items)
-			ce(err, "decode")
-			<-sem
-			wg.Done()
-		}()
 	}
-	wg.Wait()
 }
 
 func (b *FileBackend) Stats() {
