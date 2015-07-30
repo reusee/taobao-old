@@ -24,6 +24,9 @@ type FileBackend struct {
 	fgCats     StrSet
 	fgCatsFile *dsfile.File
 
+	bgCats     map[int]*BgCat
+	bgCatsFile *dsfile.File
+
 	collected map[Job]bool
 
 	itemsFile *os.File
@@ -45,6 +48,7 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 
 	b = &FileBackend{
 		fgCats:    NewStrSet(),
+		bgCats:    make(map[int]*BgCat),
 		closed:    make(chan struct{}),
 		collected: make(map[Job]bool),
 	}
@@ -52,6 +56,10 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	b.fgCatsFile, err = dsfile.New(&b.fgCats, filepath.Join(dataDir, "fgcats"),
 		new(dsfile.Json), dsfile.NewFileLocker(filepath.Join(dataDir, "fgcats.lock")))
 	ce(err, "fgcats file")
+
+	b.bgCatsFile, err = dsfile.New(&b.bgCats, filepath.Join(dataDir, "bgcats"),
+		new(dsfile.Cbor), dsfile.NewFileLocker(filepath.Join(dataDir, "bgcats.lock")))
+	ce(err, "bgcats file")
 
 	b.itemsLock = new(sync.Mutex)
 	itemsFile, err := os.OpenFile(filepath.Join(dataDir, sp("%s-items", date)),
@@ -109,35 +117,41 @@ func (b *FileBackend) scanItemsFile() (err error) {
 
 func (b *FileBackend) Close() {
 	b.fgCatsFile.Close()
+	b.bgCatsFile.Close()
 	b.itemsFile.Close()
 }
 
-func (b *FileBackend) AddBgCat(cat Cat) error {
-	if true {
-		panic("not needed")
+func (b *FileBackend) AddBgCat(cat Cat) (err error) {
+	defer ct(&err)
+	b.bgCats[cat.Cat] = &BgCat{
+		Cat:  cat.Cat,
+		Name: cat.Name,
+		Subs: NewIntSet(),
 	}
-	return nil
+	b.bgCats[cat.Parent].Subs.Add(cat.Cat)
+	err = b.bgCatsFile.Save()
+	ce(err, "save bgcats file")
+	return
 }
 
 func (b *FileBackend) GetBgCatLastUpdated(cat int) (t time.Time, err error) {
-	if true {
-		panic("not needed")
+	if cat, ok := b.bgCats[cat]; ok {
+		t = cat.LastUpdated
 	}
 	return
 }
 
 func (b *FileBackend) SetBgCatLastUpdated(cat int, t time.Time) error {
-	if true {
-		panic("not needed")
-	}
-	return nil
+	b.bgCats[cat].LastUpdated = t
+	return b.bgCatsFile.Save()
 }
 
 func (b *FileBackend) AddFgCat(cat Cat) (err error) {
+	defer ct(&err)
 	b.fgCats.Add(strconv.Itoa(cat.Cat))
 	err = b.fgCatsFile.Save()
 	ce(err, "save fgcats file")
-	return nil
+	return
 }
 
 func (b *FileBackend) GetFgCats() (cats []Cat, err error) {

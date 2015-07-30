@@ -117,3 +117,10 @@ type NavData struct {
 	}
 	Hidenav bool
 }
+
+type BgCat struct {
+	Cat         int
+	Name        string
+	Subs        IntSet
+	LastUpdated time.Time
+}
