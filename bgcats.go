@@ -89,10 +89,12 @@ func CollectBackgroundCategories(backend Backend) {
 			}
 		}
 
-		cat, err := strconv.Atoi(sid)
-		ce(err, "strconv")
-		err = backend.SetBgCatLastUpdated(cat, time.Now())
-		ce(err, "set bgcat last updated")
+		if sid != "" {
+			cat, err := strconv.Atoi(sid)
+			ce(err, "strconv")
+			err = backend.SetBgCatLastUpdated(cat, time.Now())
+			ce(err, "set bgcat last updated")
+		}
 		return
 	}
 	collect("all", "")
