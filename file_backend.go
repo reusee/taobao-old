@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/binary"
+	"encoding/gob"
 	"io"
 	"os"
 	"path/filepath"
@@ -22,6 +23,9 @@ var _ Backend = new(FileBackend)
 var codecHandle = new(codec.CborHandle)
 
 type FileBackend struct {
+	date    string
+	dataDir string
+
 	fgCats     StrSet
 	fgCatsFile *dsfile.File
 
@@ -31,8 +35,9 @@ type FileBackend struct {
 
 	collected map[Job]bool
 
-	itemsFile *os.File
-	itemsLock *sync.Mutex
+	itemsFile         *os.File
+	itemsLock         *sync.Mutex
+	itemsFileScanOnce *sync.Once
 
 	closed chan struct{}
 }
@@ -49,10 +54,13 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	dataDir := "data"
 
 	b = &FileBackend{
-		fgCats:    NewStrSet(),
-		bgCats:    make(map[int]*BgCat),
-		closed:    make(chan struct{}),
-		collected: make(map[Job]bool),
+		date:              date,
+		dataDir:           dataDir,
+		fgCats:            NewStrSet(),
+		bgCats:            make(map[int]*BgCat),
+		closed:            make(chan struct{}),
+		collected:         make(map[Job]bool),
+		itemsFileScanOnce: new(sync.Once),
 	}
 
 	b.fgCatsFile, err = dsfile.New(&b.fgCats, filepath.Join(dataDir, "fgcats"),
@@ -68,9 +76,6 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 		os.O_RDWR|os.O_CREATE, 0644)
 	ce(err, "open items file")
 	b.itemsFile = itemsFile
-
-	err = b.scanItemsFile()
-	ce(err, "scan items file")
 
 	go func() {
 		t := time.NewTicker(time.Second*3 + time.Millisecond*500)
@@ -179,6 +184,10 @@ func (b *FileBackend) GetFgCats() (cats []Cat, err error) {
 
 func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
+	b.itemsFileScanOnce.Do(func() {
+		err := b.scanItemsFile()
+		ce(err, "scan items file")
+	})
 	buf := new(bytes.Buffer)
 	w := gzip.NewWriter(buf)
 	err = codec.NewEncoder(w, codecHandle).Encode(items)
@@ -201,6 +210,10 @@ func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 }
 
 func (b *FileBackend) IsCollected(job Job) bool {
+	b.itemsFileScanOnce.Do(func() {
+		err := b.scanItemsFile()
+		ce(err, "scan items file")
+	})
 	return b.collected[job]
 }
 
@@ -276,6 +289,11 @@ func (b *FileBackend) Foo() {
 			catSum[item.Category] += item.Sales
 		}
 	}
+	catSumFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-sales", b.date)))
+	ce(err, "create cat sales file")
+	defer catSumFile.Close()
+	err = gob.NewEncoder(catSumFile).Encode(catSum)
+	ce(err, "save cat sum")
 }
 
 func (b *FileBackend) Stats() {
