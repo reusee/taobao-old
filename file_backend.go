@@ -116,7 +116,9 @@ func (b *FileBackend) scanItemsFile() (err error) {
 }
 
 func (b *FileBackend) Close() {
+	b.fgCatsFile.Save()
 	b.fgCatsFile.Close()
+	b.bgCatsFile.Save()
 	b.bgCatsFile.Close()
 	b.itemsFile.Close()
 }
