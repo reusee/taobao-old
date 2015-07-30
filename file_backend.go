@@ -123,6 +123,9 @@ func (b *FileBackend) Close() {
 
 func (b *FileBackend) AddBgCat(cat Cat) (err error) {
 	defer ct(&err)
+	if _, ok := b.bgCats[cat.Cat]; ok {
+		return nil
+	}
 	b.bgCats[cat.Cat] = &BgCat{
 		Cat:  cat.Cat,
 		Name: cat.Name,
