@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,8 +25,9 @@ type FileBackend struct {
 	date    string
 	dataDir string
 
-	fgCats     StrSet
-	fgCatsFile *dsfile.File
+	fgCats          IntSet
+	fgCatsFile      *dsfile.File
+	fgCatsFileDirty uint32
 
 	bgCats          map[int]*BgCat
 	bgCatsFile      *dsfile.File
@@ -56,7 +56,7 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	b = &FileBackend{
 		date:              date,
 		dataDir:           dataDir,
-		fgCats:            NewStrSet(),
+		fgCats:            NewIntSet(),
 		bgCats:            make(map[int]*BgCat),
 		closed:            make(chan struct{}),
 		collected:         make(map[Job]bool),
@@ -64,7 +64,7 @@ func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	}
 
 	b.fgCatsFile, err = dsfile.New(&b.fgCats, filepath.Join(dataDir, "fgcats"),
-		new(dsfile.Json), dsfile.NewFileLocker(filepath.Join(dataDir, "fgcats.lock")))
+		new(dsfile.Cbor), dsfile.NewFileLocker(filepath.Join(dataDir, "fgcats.lock")))
 	ce(err, "fgcats file")
 
 	b.bgCatsFile, err = dsfile.New(&b.bgCats, filepath.Join(dataDir, "bgcats"),
@@ -165,18 +165,18 @@ func (b *FileBackend) SetBgCatLastUpdated(cat int, t time.Time) error {
 
 func (b *FileBackend) AddFgCat(cat Cat) (err error) {
 	defer ct(&err)
-	b.fgCats.Add(strconv.Itoa(cat.Cat))
-	err = b.fgCatsFile.Save()
-	ce(err, "save fgcats file")
+	b.fgCats.Add(cat.Cat)
+	if atomic.AddUint32(&b.fgCatsFileDirty, 1)%128 == 0 {
+		err = b.fgCatsFile.Save()
+		ce(err, "save fgcats file")
+	}
 	return
 }
 
 func (b *FileBackend) GetFgCats() (cats []Cat, err error) {
 	for cat := range b.fgCats {
-		c, err := strconv.Atoi(cat)
-		ce(err, "strconv")
 		cats = append(cats, Cat{
-			Cat: c,
+			Cat: cat,
 		})
 	}
 	return
