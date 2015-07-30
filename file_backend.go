@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/reusee/dsfile"
@@ -24,8 +25,9 @@ type FileBackend struct {
 	fgCats     StrSet
 	fgCatsFile *dsfile.File
 
-	bgCats     map[int]*BgCat
-	bgCatsFile *dsfile.File
+	bgCats          map[int]*BgCat
+	bgCatsFile      *dsfile.File
+	bgCatsFileDirty uint32
 
 	collected map[Job]bool
 
@@ -134,8 +136,10 @@ func (b *FileBackend) AddBgCat(cat Cat) (err error) {
 		Subs: NewIntSet(),
 	}
 	b.bgCats[cat.Parent].Subs.Add(cat.Cat)
-	err = b.bgCatsFile.Save()
-	ce(err, "save bgcats file")
+	if atomic.AddUint32(&b.bgCatsFileDirty, 1)%128 == 0 {
+		err = b.bgCatsFile.Save()
+		ce(err, "save bgcats file")
+	}
 	return
 }
 
@@ -148,7 +152,10 @@ func (b *FileBackend) GetBgCatLastUpdated(cat int) (t time.Time, err error) {
 
 func (b *FileBackend) SetBgCatLastUpdated(cat int, t time.Time) error {
 	b.bgCats[cat].LastUpdated = t
-	return b.bgCatsFile.Save()
+	if atomic.AddUint32(&b.bgCatsFileDirty, 1)%128 == 0 {
+		return b.bgCatsFile.Save()
+	}
+	return nil
 }
 
 func (b *FileBackend) AddFgCat(cat Cat) (err error) {
