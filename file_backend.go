@@ -294,6 +294,11 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 }
 
 func (b *FileBackend) PostProcess() {
+	t0 := time.Now()
+	defer func() {
+		pt("post processed in %v\n", time.Now().Sub(t0))
+	}()
+
 	// cat stats
 	catStats := make(map[int]*CatStat)
 	b.iterItems(func(item Item) {
@@ -313,8 +318,8 @@ func (b *FileBackend) PostProcess() {
 func (b *FileBackend) Stats() {
 	// read cat stats
 	catStats := make(map[int]*CatStat)
-	catStatsFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
-	ce(err, "create cat stats file")
+	catStatsFile, err := os.Open(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
+	ce(err, "open cat stats file")
 	defer catStatsFile.Close()
 	err = gob.NewDecoder(catStatsFile).Decode(&catStats)
 	ce(err, "decode cat stats")
