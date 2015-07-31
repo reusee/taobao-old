@@ -217,12 +217,14 @@ func (b *FileBackend) IsCollected(job Job) bool {
 	return b.collected[job]
 }
 
-func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bool) {
+func (b *FileBackend) iterItems(fn func(Item) bool) {
 	b.itemsFile.Seek(0, os.SEEK_SET)
 	bss := make(chan *[]byte)
+	done := make(chan struct{})
 
 	// read entries
 	go func() {
+	loop:
 		for {
 			var header EntryHeader
 			err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
@@ -231,13 +233,13 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 				break
 			}
 			ce(err, "read header")
-			if headerFilter != nil && !headerFilter(header) {
-				b.itemsFile.Seek(int64(header.Len), os.SEEK_CUR)
-			} else {
-				bs := make([]byte, header.Len)
-				_, err = io.ReadFull(b.itemsFile, bs)
-				ce(err, "read data")
-				bss <- &bs
+			bs := make([]byte, header.Len)
+			_, err = io.ReadFull(b.itemsFile, bs)
+			ce(err, "read data")
+			select {
+			case bss <- &bs:
+			case <-done:
+				break loop
 			}
 		}
 		bss <- nil
@@ -248,8 +250,14 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 	go func() {
 		sem := make(chan struct{}, runtime.NumCPU())
 		wg := new(sync.WaitGroup)
+	loop:
 		for {
-			bsp := <-bss
+			var bsp *[]byte
+			select {
+			case bsp = <-bss:
+			case <-done:
+				break loop
+			}
 			if bsp == nil {
 				break
 			}
@@ -257,18 +265,27 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 			sem <- struct{}{}
 			bs := *bsp
 			go func() {
+				defer func() {
+					<-sem
+					wg.Done()
+				}()
 				r, err := gzip.NewReader(bytes.NewReader(bs))
 				ce(err, "new gzip reader")
 				var items []Item
 				err = codec.NewDecoder(r, codecHandle).Decode(&items)
 				ce(err, "decode")
-				itemsChan <- &items
-				<-sem
-				wg.Done()
+				select {
+				case itemsChan <- &items:
+				case <-done:
+					return
+				}
 			}()
 		}
 		wg.Wait()
-		itemsChan <- nil
+		select {
+		case itemsChan <- nil:
+		case <-done:
+		}
 	}()
 
 	// process
@@ -276,6 +293,7 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 	for i := 0; i < 1000; i++ {
 		itemIdSet[i] = NewIntSet()
 	}
+loop:
 	for {
 		items := <-itemsChan
 		if items == nil {
@@ -288,9 +306,12 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 				continue
 			}
 			itemIdSet[slot].Add(item.Nid)
-			fn(item)
+			if !fn(item) {
+				break loop
+			}
 		}
 	}
+	close(done)
 }
 
 func (b *FileBackend) PostProcess() {
@@ -301,13 +322,14 @@ func (b *FileBackend) PostProcess() {
 
 	// cat stats
 	catStats := make(map[int]*CatStat)
-	b.iterItems(func(item Item) {
+	b.iterItems(func(item Item) bool {
 		if _, ok := catStats[item.Category]; !ok {
 			catStats[item.Category] = new(CatStat)
 		}
 		catStats[item.Category].Items += 1
 		catStats[item.Category].Sales += item.Sales
-	}, nil)
+		return true
+	})
 	catStatsFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
 	ce(err, "create cat stats file")
 	defer catStatsFile.Close()
@@ -325,8 +347,8 @@ func (b *FileBackend) Stats() {
 	ce(err, "decode cat stats")
 
 	// collect unknown bgcats
-	/*
-		unknownCats := Ints([]int{})
+	unknownCats := Ints([]int{})
+	if true {
 		knownCats := Ints([]int{})
 		for cat, _ := range catStats {
 			if _, ok := b.bgCats[cat]; !ok {
@@ -341,10 +363,23 @@ func (b *FileBackend) Stats() {
 		knownCats.Sort(func(a, b int) bool {
 			return catStats[a].Sales > catStats[b].Sales
 		})
+	}
+
+	// show items in unknown cats
+	if true {
 		for _, cat := range unknownCats {
-			pt("%d %d\n", cat, catStats[cat].Sales)
+			n := 0
+			b.iterItems(func(item Item) bool {
+				if item.Category != cat {
+					return true
+				}
+				pt("%s\n", item.Title)
+				n++
+				return n < 30
+			})
+			pt("\n")
 		}
-	*/
+	}
 
 }
 
