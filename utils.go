@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
@@ -126,4 +127,22 @@ func withLock(l sync.Locker, fn func()) {
 	l.Lock()
 	fn()
 	l.Unlock()
+}
+
+type Ints []int
+
+func (s Ints) Sort(cmp func(a, b int) bool) {
+	sorter := sliceSorter{
+		l: len(s),
+		less: func(i, j int) bool {
+			return cmp(s[i], s[j])
+		},
+		swap: func(i, j int) {
+			s[i], s[j] = s[j], s[i]
+		},
+	}
+	_ = sorter.Len
+	_ = sorter.Less
+	_ = sorter.Swap
+	sort.Sort(sorter)
 }

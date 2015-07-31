@@ -217,7 +217,7 @@ func (b *FileBackend) IsCollected(job Job) bool {
 	return b.collected[job]
 }
 
-func (b *FileBackend) Foo() {
+func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bool) {
 	b.itemsFile.Seek(0, os.SEEK_SET)
 	bss := make(chan *[]byte)
 
@@ -230,11 +230,15 @@ func (b *FileBackend) Foo() {
 				err = nil
 				break
 			}
-			ce(err, "read length")
-			bs := make([]byte, header.Len)
-			_, err = io.ReadFull(b.itemsFile, bs)
-			ce(err, "read data")
-			bss <- &bs
+			ce(err, "read header")
+			if headerFilter != nil && !headerFilter(header) {
+				b.itemsFile.Seek(int64(header.Len), os.SEEK_CUR)
+			} else {
+				bs := make([]byte, header.Len)
+				_, err = io.ReadFull(b.itemsFile, bs)
+				ce(err, "read data")
+				bss <- &bs
+			}
 		}
 		bss <- nil
 	}()
@@ -272,7 +276,6 @@ func (b *FileBackend) Foo() {
 	for i := 0; i < 1000; i++ {
 		itemIdSet[i] = NewIntSet()
 	}
-	catSum := make(map[int]int)
 	for {
 		items := <-itemsChan
 		if items == nil {
@@ -285,10 +288,17 @@ func (b *FileBackend) Foo() {
 				continue
 			}
 			itemIdSet[slot].Add(item.Nid)
-			// cat
-			catSum[item.Category] += item.Sales
+			fn(item)
 		}
 	}
+}
+
+func (b *FileBackend) Foo() {
+	// process
+	catSum := make(map[int]int)
+	b.iterItems(func(item Item) {
+		catSum[item.Category] += item.Sales
+	}, nil)
 	catSumFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-sales", b.date)))
 	ce(err, "create cat sales file")
 	defer catSumFile.Close()
@@ -297,6 +307,32 @@ func (b *FileBackend) Foo() {
 }
 
 func (b *FileBackend) Stats() {
+	// read cat sales sum
+	var catSum map[int]int
+	catSumFile, err := os.Open(filepath.Join(b.dataDir, sp("%s-cat-sales", b.date)))
+	ce(err, "open cat sales sum file")
+	defer catSumFile.Close()
+	err = gob.NewDecoder(catSumFile).Decode(&catSum)
+	ce(err, "decode cat sales sum file")
+
+	unknownCats := Ints([]int{})
+	knownCats := Ints([]int{})
+	for cat, _ := range catSum {
+		if _, ok := b.bgCats[cat]; !ok {
+			unknownCats = append(unknownCats, cat)
+		} else {
+			knownCats = append(knownCats, cat)
+		}
+	}
+	unknownCats.Sort(func(a, b int) bool {
+		return catSum[a] > catSum[b]
+	})
+	knownCats.Sort(func(a, b int) bool {
+		return catSum[a] > catSum[b]
+	})
+	for _, cat := range knownCats {
+		pt("%d %d %s\n", cat, catSum[cat], b.bgCats[cat].Name)
+	}
 }
 
 func (b *FileBackend) LogClient(info ClientInfo, state ClientState) {
