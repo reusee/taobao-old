@@ -43,25 +43,23 @@ func main() {
 	*/
 
 	switch os.Args[1] {
-	case "collect":
-		backend := todayBackend()
-		taobao.Collect(backend)
-	case "stats":
-		backend := todayBackend()
-		backend.Stats()
 	case "fgcats":
 		backend := todayBackend()
 		taobao.CollectForegroundCategories(backend)
 	case "bgcats":
 		backend := todayBackend()
 		taobao.CollectBackgroundCategories(backend)
-	case "foo":
+	case "collect":
+		backend := todayBackend()
+		taobao.Collect(backend)
+
+	case "post":
 		now, err := time.Parse("2006-01-02", os.Args[2])
 		ce(err, "parse date")
 		pt("%v\n", now)
 		backend := backendByDate(now)
-		backend.Foo()
-	case "stat":
+		backend.PostProcess()
+	case "stats":
 		now, err := time.Parse("2006-01-02", os.Args[2])
 		ce(err, "parse date")
 		pt("%v\n", now)

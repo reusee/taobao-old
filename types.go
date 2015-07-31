@@ -22,7 +22,7 @@ type Backend interface {
 	SetBgCatLastUpdated(int, time.Time) error
 
 	Stats()
-	Foo()
+	PostProcess()
 
 	LogClient(ClientInfo, ClientState)
 }
@@ -97,6 +97,11 @@ type Cat struct {
 	Name      string
 	Relatives []int
 	Parent    int
+}
+
+type CatStat struct {
+	Items int
+	Sales int
 }
 
 type NavData struct {

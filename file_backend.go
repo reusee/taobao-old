@@ -293,46 +293,54 @@ func (b *FileBackend) iterItems(fn func(Item), headerFilter func(EntryHeader) bo
 	}
 }
 
-func (b *FileBackend) Foo() {
-	// process
-	catSum := make(map[int]int)
+func (b *FileBackend) PostProcess() {
+	// cat stats
+	catStats := make(map[int]*CatStat)
 	b.iterItems(func(item Item) {
-		catSum[item.Category] += item.Sales
+		if _, ok := catStats[item.Category]; !ok {
+			catStats[item.Category] = new(CatStat)
+		}
+		catStats[item.Category].Items += 1
+		catStats[item.Category].Sales += item.Sales
 	}, nil)
-	catSumFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-sales", b.date)))
-	ce(err, "create cat sales file")
-	defer catSumFile.Close()
-	err = gob.NewEncoder(catSumFile).Encode(catSum)
-	ce(err, "save cat sum")
+	catStatsFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
+	ce(err, "create cat stats file")
+	defer catStatsFile.Close()
+	err = gob.NewEncoder(catStatsFile).Encode(catStats)
+	ce(err, "save cat stats")
 }
 
 func (b *FileBackend) Stats() {
-	// read cat sales sum
-	var catSum map[int]int
-	catSumFile, err := os.Open(filepath.Join(b.dataDir, sp("%s-cat-sales", b.date)))
-	ce(err, "open cat sales sum file")
-	defer catSumFile.Close()
-	err = gob.NewDecoder(catSumFile).Decode(&catSum)
-	ce(err, "decode cat sales sum file")
+	// read cat stats
+	catStats := make(map[int]*CatStat)
+	catStatsFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
+	ce(err, "create cat stats file")
+	defer catStatsFile.Close()
+	err = gob.NewDecoder(catStatsFile).Decode(&catStats)
+	ce(err, "decode cat stats")
 
-	unknownCats := Ints([]int{})
-	knownCats := Ints([]int{})
-	for cat, _ := range catSum {
-		if _, ok := b.bgCats[cat]; !ok {
-			unknownCats = append(unknownCats, cat)
-		} else {
-			knownCats = append(knownCats, cat)
+	// collect unknown bgcats
+	/*
+		unknownCats := Ints([]int{})
+		knownCats := Ints([]int{})
+		for cat, _ := range catStats {
+			if _, ok := b.bgCats[cat]; !ok {
+				unknownCats = append(unknownCats, cat)
+			} else {
+				knownCats = append(knownCats, cat)
+			}
 		}
-	}
-	unknownCats.Sort(func(a, b int) bool {
-		return catSum[a] > catSum[b]
-	})
-	knownCats.Sort(func(a, b int) bool {
-		return catSum[a] > catSum[b]
-	})
-	for _, cat := range knownCats {
-		pt("%d %d %s\n", cat, catSum[cat], b.bgCats[cat].Name)
-	}
+		unknownCats.Sort(func(a, b int) bool {
+			return catStats[a].Sales > catStats[b].Sales
+		})
+		knownCats.Sort(func(a, b int) bool {
+			return catStats[a].Sales > catStats[b].Sales
+		})
+		for _, cat := range unknownCats {
+			pt("%d %d\n", cat, catStats[cat].Sales)
+		}
+	*/
+
 }
 
 func (b *FileBackend) LogClient(info ClientInfo, state ClientState) {
