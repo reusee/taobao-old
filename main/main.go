@@ -27,6 +27,14 @@ func main() {
 		}
 		return backend
 	}
+	backendByDate := func(t time.Time) taobao.Backend {
+		backend, err := taobao.NewFileBackend(t)
+		ce(err, "file backend")
+		closeFunc = func() {
+			backend.Close()
+		}
+		return backend
+	}
 
 	/*
 		backend, err := NewMysql()
@@ -47,17 +55,18 @@ func main() {
 	case "bgcats":
 		backend := todayBackend()
 		taobao.CollectBackgroundCategories(backend)
-
 	case "foo":
 		now, err := time.Parse("2006-01-02", os.Args[2])
 		ce(err, "parse date")
 		pt("%v\n", now)
-		backend, err := taobao.NewFileBackend(now)
-		ce(err, "file backend")
-		closeFunc = func() {
-			backend.Close()
-		}
+		backend := backendByDate(now)
 		backend.Foo()
+	case "stat":
+		now, err := time.Parse("2006-01-02", os.Args[2])
+		ce(err, "parse date")
+		pt("%v\n", now)
+		backend := backendByDate(now)
+		backend.Stats()
 	}
 
 	closeFunc()
