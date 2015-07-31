@@ -77,16 +77,6 @@ type Item struct {
 	SellerCredit      int
 }
 
-type Raw struct {
-	Cat, Page int
-	Items     []RawItem
-	Html      []byte
-}
-
-type Source struct {
-	Cat, Page int
-}
-
 type Job struct {
 	Cat, Page int
 	Done      bool
