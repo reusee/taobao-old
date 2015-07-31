@@ -218,100 +218,83 @@ func (b *FileBackend) IsCollected(job Job) bool {
 }
 
 func (b *FileBackend) iterItems(fn func(Item) bool) {
-	b.itemsFile.Seek(0, os.SEEK_SET)
-	bss := make(chan *[]byte)
-	done := make(chan struct{})
+	itemsFile, err := os.Open(filepath.Join(b.dataDir, sp("%s-items", b.date)))
+	ce(err, "open items file")
+	kill := make(chan struct{})
 
 	// read entries
+	bss := make(chan []byte)
 	go func() {
 	loop:
 		for {
 			var header EntryHeader
-			err := binary.Read(b.itemsFile, binary.LittleEndian, &header)
+			err := binary.Read(itemsFile, binary.LittleEndian, &header)
 			if err == io.EOF {
 				err = nil
 				break
 			}
 			ce(err, "read header")
 			bs := make([]byte, header.Len)
-			_, err = io.ReadFull(b.itemsFile, bs)
+			_, err = io.ReadFull(itemsFile, bs)
 			ce(err, "read data")
 			select {
-			case bss <- &bs:
-			case <-done:
+			case bss <- bs:
+			case <-kill:
 				break loop
 			}
 		}
-		bss <- nil
+		close(bss)
 	}()
 
 	// decode
-	itemsChan := make(chan *[]Item, 200000)
-	go func() {
-		sem := make(chan struct{}, runtime.NumCPU())
-		wg := new(sync.WaitGroup)
-	loop:
-		for {
-			var bsp *[]byte
+	itemsChan := make(chan []Item)
+	wg := new(sync.WaitGroup)
+	ncpu := runtime.NumCPU()
+	wg.Add(ncpu)
+	decode := func() {
+		defer wg.Done()
+		for bs := range bss {
+			r, err := gzip.NewReader(bytes.NewReader(bs))
+			ce(err, "new gzip reader")
+			var items []Item
+			err = codec.NewDecoder(r, codecHandle).Decode(&items)
+			ce(err, "decode")
 			select {
-			case bsp = <-bss:
-			case <-done:
-				break loop
+			case itemsChan <- items:
+			case <-kill:
+				return
 			}
-			if bsp == nil {
-				break
-			}
-			wg.Add(1)
-			sem <- struct{}{}
-			bs := *bsp
-			go func() {
-				defer func() {
-					<-sem
-					wg.Done()
-				}()
-				r, err := gzip.NewReader(bytes.NewReader(bs))
-				ce(err, "new gzip reader")
-				var items []Item
-				err = codec.NewDecoder(r, codecHandle).Decode(&items)
-				ce(err, "decode")
-				select {
-				case itemsChan <- &items:
-				case <-done:
-					return
-				}
-			}()
 		}
+	}
+	for i := 0; i < ncpu; i++ {
+		go decode()
+	}
+	go func() {
 		wg.Wait()
-		select {
-		case itemsChan <- nil:
-		case <-done:
-		}
+		close(itemsChan)
 	}()
 
-	// process
+	// process items
 	var itemIdSet [1000]IntSet
 	for i := 0; i < 1000; i++ {
 		itemIdSet[i] = NewIntSet()
 	}
 loop:
-	for {
-		items := <-itemsChan
-		if items == nil {
-			break
-		}
-		for _, item := range *items {
+	for items := range itemsChan {
+		for _, item := range items {
 			// dedup
 			slot := item.Nid % 1000
 			if itemIdSet[slot].Has(item.Nid) {
 				continue
 			}
 			itemIdSet[slot].Add(item.Nid)
+			// callback
 			if !fn(item) {
+				close(kill)
 				break loop
 			}
 		}
 	}
-	close(done)
 }
 
 func (b *FileBackend) PostProcess() {
@@ -348,7 +331,7 @@ func (b *FileBackend) Stats() {
 
 	// collect unknown bgcats
 	unknownCats := Ints([]int{})
-	if true {
+	if false {
 		knownCats := Ints([]int{})
 		for cat, _ := range catStats {
 			if _, ok := b.bgCats[cat]; !ok {
@@ -366,7 +349,7 @@ func (b *FileBackend) Stats() {
 	}
 
 	// show items in unknown cats
-	if true {
+	if false {
 		for _, cat := range unknownCats {
 			n := 0
 			b.iterItems(func(item Item) bool {
@@ -380,6 +363,13 @@ func (b *FileBackend) Stats() {
 			pt("\n")
 		}
 	}
+
+	n := 0
+	b.iterItems(func(item Item) bool {
+		n++
+		return true
+	})
+	pt("%d\n", n)
 
 }
 
