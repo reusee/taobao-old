@@ -39,7 +39,7 @@ func Collect(backend Backend) {
 
 	var c1, c2 uint64
 	go func() {
-		ticker := time.NewTicker(time.Second * 5)
+		ticker := time.NewTicker(time.Second * 10)
 		t0 := time.Now()
 		for range ticker.C {
 			pt("%d / %d - %v\n", atomic.SwapUint64(&c1, 0), atomic.LoadUint64(&c2), time.Now().Sub(t0))
@@ -47,7 +47,7 @@ func Collect(backend Backend) {
 	}()
 
 	go func() {
-		sem := make(chan struct{}, 256)
+		sem := make(chan struct{}, 128)
 		for {
 			job := <-jobsOut
 			sem <- struct{}{}
