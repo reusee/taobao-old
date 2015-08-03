@@ -62,19 +62,43 @@ type RawItem struct {
 }
 
 type Item struct {
-	Nid               int
-	Category          int
-	Title             string
-	Price             *big.Rat
-	Location          string
-	Sales             int
+	Nid int
+	Item1
+	Item2
+	Item3
+}
+
+// 常用
+type Item1 struct {
+	Category int
+	Price    *big.Rat
+	Sales    int
+	Seller   int
+}
+
+// 长字段
+type Item2 struct {
+	Title    string
+	Location string
+}
+
+// 不常用
+type Item3 struct {
 	Comments          int
-	Seller            int
 	SellerEncryptedId string
 	SellerName        string
 	SellerLevels      []uint8
 	SellerIsTmall     bool
 	SellerCredit      int
+}
+
+type EntryHeader struct {
+	Cat     uint64
+	Page    uint8
+	NidsLen uint32
+	Len1    uint32
+	Len2    uint32
+	Len3    uint32
 }
 
 type Job struct {

@@ -42,12 +42,6 @@ type FileBackend struct {
 	closed chan struct{}
 }
 
-type EntryHeader struct {
-	Cat  uint64
-	Page uint8
-	Len  uint32
-}
-
 func NewFileBackend(now time.Time) (b *FileBackend, err error) {
 	defer ct(&err)
 	date := sp("%04d%02d%02d", now.Year(), now.Month(), now.Day())
@@ -108,9 +102,15 @@ func (b *FileBackend) scanItemsFile() (err error) {
 			err = nil
 			break
 		}
-		ce(err, "read entry len")
-		_, err = b.itemsFile.Seek(int64(header.Len), os.SEEK_CUR)
-		ce(err, "seek entry")
+		ce(err, "read entry header")
+		_, err = b.itemsFile.Seek(int64(header.NidsLen), os.SEEK_CUR)
+		ce(err, "seek")
+		_, err = b.itemsFile.Seek(int64(header.Len1), os.SEEK_CUR)
+		ce(err, "seek")
+		_, err = b.itemsFile.Seek(int64(header.Len2), os.SEEK_CUR)
+		ce(err, "seek")
+		_, err = b.itemsFile.Seek(int64(header.Len3), os.SEEK_CUR)
+		ce(err, "seek")
 		job := Job{
 			Cat:  int(header.Cat),
 			Page: int(header.Page),
@@ -182,29 +182,60 @@ func (b *FileBackend) GetFgCats() (cats []Cat, err error) {
 	return
 }
 
+func encode(o interface{}) (bs []byte, err error) {
+	defer ct(&err)
+	buf := new(bytes.Buffer)
+	w := gzip.NewWriter(buf)
+	err = codec.NewEncoder(w, codecHandle).Encode(o)
+	ce(err, "encode")
+	err = w.Close()
+	ce(err, "close write")
+	return buf.Bytes(), nil
+}
+
 func (b *FileBackend) AddItems(items []Item, job Job) (err error) {
 	defer ct(&err)
 	b.itemsFileScanOnce.Do(func() {
 		err := b.scanItemsFile()
 		ce(err, "scan items file")
 	})
-	buf := new(bytes.Buffer)
-	w := gzip.NewWriter(buf)
-	err = codec.NewEncoder(w, codecHandle).Encode(items)
-	ce(err, "gob encode")
-	err = w.Close()
-	ce(err, "close write")
-	bs := buf.Bytes()
+	var nids []int
+	var c1 []Item1
+	var c2 []Item2
+	var c3 []Item3
+	for _, item := range items {
+		nids = append(nids, item.Nid)
+		c1 = append(c1, item.Item1)
+		c2 = append(c2, item.Item2)
+		c3 = append(c3, item.Item3)
+	}
+	nidsBs, err := encode(nids)
+	ce(err, "encode nids")
+	c1Bs, err := encode(c1)
+	ce(err, "encode col set 1")
+	c2Bs, err := encode(c2)
+	ce(err, "encode col set 2")
+	c3Bs, err := encode(c3)
+	ce(err, "encode col set 3")
 	withLock(b.itemsLock, func() {
 		header := EntryHeader{
-			Cat:  uint64(job.Cat),
-			Page: uint8(job.Page),
-			Len:  uint32(len(bs)),
+			Cat:     uint64(job.Cat),
+			Page:    uint8(job.Page),
+			NidsLen: uint32(len(nidsBs)),
+			Len1:    uint32(len(c1Bs)),
+			Len2:    uint32(len(c2Bs)),
+			Len3:    uint32(len(c3Bs)),
 		}
 		err = binary.Write(b.itemsFile, binary.LittleEndian, header)
 		ce(err, "write items file entry header")
-		_, err = b.itemsFile.Write(bs)
-		ce(err, "write items entry")
+		_, err = b.itemsFile.Write(nidsBs)
+		ce(err, "write nids")
+		_, err = b.itemsFile.Write(c1Bs)
+		ce(err, "write col set 1")
+		_, err = b.itemsFile.Write(c2Bs)
+		ce(err, "write col set 2")
+		_, err = b.itemsFile.Write(c3Bs)
+		ce(err, "write col set 3")
 	})
 	return nil
 }
@@ -217,16 +248,32 @@ func (b *FileBackend) IsCollected(job Job) bool {
 	return b.collected[job]
 }
 
-func (b *FileBackend) iterItems(fn func(Item) bool) {
+const (
+	ColSet1 uint8 = 1
+	ColSet2 uint8 = 2
+	ColSet3 uint8 = 4
+)
+
+func decode(bs []byte, target interface{}) (err error) {
+	defer ct(&err)
+	r, err := gzip.NewReader(bytes.NewReader(bs))
+	ce(err, "new gzip reader")
+	err = codec.NewDecoder(r, codecHandle).Decode(target)
+	ce(err, "decode")
+	return
+}
+
+func (b *FileBackend) iterItems(colSets uint8, fn func(nid int, c1 *Item1, c2 *Item2, c3 *Item3) bool) {
 	itemsFile, err := os.Open(filepath.Join(b.dataDir, sp("%s-items", b.date)))
 	ce(err, "open items file")
 	kill := make(chan struct{})
 
 	// read entries
-	bss := make(chan []byte)
+	rawss := make(chan [4][]byte)
 	go func() {
 	loop:
 		for {
+			// decode header
 			var header EntryHeader
 			err := binary.Read(itemsFile, binary.LittleEndian, &header)
 			if err == io.EOF {
@@ -234,33 +281,81 @@ func (b *FileBackend) iterItems(fn func(Item) bool) {
 				break
 			}
 			ce(err, "read header")
-			bs := make([]byte, header.Len)
+			// decode column sets
+			raw := [4][]byte{}
+			bs := make([]byte, header.NidsLen)
 			_, err = io.ReadFull(itemsFile, bs)
-			ce(err, "read data")
+			ce(err, "read nids bytes")
+			raw[0] = bs
+			if colSets&ColSet1 != 0 {
+				bs = make([]byte, header.Len1)
+				_, err = io.ReadFull(itemsFile, bs)
+				ce(err, "read col set 1")
+				raw[1] = bs
+			} else {
+				_, err = itemsFile.Seek(int64(header.Len1), os.SEEK_CUR)
+				ce(err, "seek")
+			}
+			if colSets&ColSet2 != 0 {
+				bs = make([]byte, header.Len2)
+				_, err = io.ReadFull(itemsFile, bs)
+				ce(err, "read col set 2")
+				raw[2] = bs
+			} else {
+				_, err = itemsFile.Seek(int64(header.Len2), os.SEEK_CUR)
+				ce(err, "seek")
+			}
+			if colSets&ColSet3 != 0 {
+				bs = make([]byte, header.Len3)
+				_, err = io.ReadFull(itemsFile, bs)
+				ce(err, "read col set 3")
+				raw[3] = bs
+			} else {
+				_, err = itemsFile.Seek(int64(header.Len3), os.SEEK_CUR)
+				ce(err, "seek")
+			}
+			// send
 			select {
-			case bss <- bs:
+			case rawss <- raw:
 			case <-kill:
 				break loop
 			}
 		}
-		close(bss)
+		close(rawss)
 	}()
 
 	// decode
-	itemsChan := make(chan []Item)
+	type Info struct {
+		Nids []int
+		C1   []Item1
+		C2   []Item2
+		C3   []Item3
+	}
+	itemsChan := make(chan Info)
 	wg := new(sync.WaitGroup)
 	ncpu := runtime.NumCPU()
 	wg.Add(ncpu)
 	decode := func() {
 		defer wg.Done()
-		for bs := range bss {
-			r, err := gzip.NewReader(bytes.NewReader(bs))
-			ce(err, "new gzip reader")
-			var items []Item
-			err = codec.NewDecoder(r, codecHandle).Decode(&items)
-			ce(err, "decode")
+		for raw := range rawss {
+			var info Info
+			err = decode(raw[0], &info.Nids)
+			ce(err, "decode nids")
+			if colSets&ColSet1 != 0 {
+				err = decode(raw[1], &info.C1)
+				ce(err, "decode c1")
+			}
+			if colSets&ColSet2 != 0 {
+				err = decode(raw[2], &info.C2)
+				pt("%d\n", len(raw[2]))
+				ce(err, "decode c2")
+			}
+			if colSets&ColSet3 != 0 {
+				err = decode(raw[3], &info.C3)
+				ce(err, "decode c3")
+			}
 			select {
-			case itemsChan <- items:
+			case itemsChan <- info:
 			case <-kill:
 				return
 			}
@@ -280,16 +375,28 @@ func (b *FileBackend) iterItems(fn func(Item) bool) {
 		itemIdSet[i] = NewIntSet()
 	}
 loop:
-	for items := range itemsChan {
-		for _, item := range items {
+	for info := range itemsChan {
+		for n, nid := range info.Nids {
 			// dedup
-			slot := item.Nid % 1000
-			if itemIdSet[slot].Has(item.Nid) {
+			slot := nid % 1000
+			if itemIdSet[slot].Has(nid) {
 				continue
 			}
-			itemIdSet[slot].Add(item.Nid)
+			itemIdSet[slot].Add(nid)
 			// callback
-			if !fn(item) {
+			var c1 *Item1
+			var c2 *Item2
+			var c3 *Item3
+			if colSets&ColSet1 != 0 {
+				c1 = &info.C1[n]
+			}
+			if colSets&ColSet2 != 0 {
+				c2 = &info.C2[n]
+			}
+			if colSets&ColSet3 != 0 {
+				c3 = &info.C3[n]
+			}
+			if !fn(nid, c1, c2, c3) {
 				close(kill)
 				break loop
 			}
@@ -305,12 +412,12 @@ func (b *FileBackend) PostProcess() {
 
 	// cat stats
 	catStats := make(map[int]*CatStat)
-	b.iterItems(func(item Item) bool {
-		if _, ok := catStats[item.Category]; !ok {
-			catStats[item.Category] = new(CatStat)
+	b.iterItems(ColSet1, func(nid int, c1 *Item1, c2 *Item2, c3 *Item3) bool {
+		if _, ok := catStats[c1.Category]; !ok {
+			catStats[c1.Category] = new(CatStat)
 		}
-		catStats[item.Category].Items += 1
-		catStats[item.Category].Sales += item.Sales
+		catStats[c1.Category].Items += 1
+		catStats[c1.Category].Sales += c1.Sales
 		return true
 	})
 	catStatsFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
@@ -352,11 +459,11 @@ func (b *FileBackend) Stats() {
 	if false {
 		for _, cat := range unknownCats {
 			n := 0
-			b.iterItems(func(item Item) bool {
-				if item.Category != cat {
+			b.iterItems(ColSet1|ColSet2, func(nid int, c1 *Item1, c2 *Item2, c3 *Item3) bool {
+				if c1.Category != cat {
 					return true
 				}
-				pt("%s\n", item.Title)
+				pt("%s\n", c2.Title)
 				n++
 				return n < 30
 			})
@@ -365,8 +472,9 @@ func (b *FileBackend) Stats() {
 	}
 
 	n := 0
-	b.iterItems(func(item Item) bool {
+	b.iterItems(ColSet2, func(nid int, c1 *Item1, c2 *Item2, c3 *Item3) bool {
 		n++
+		pt("%s\n", c2.Title)
 		return true
 	})
 	pt("%d\n", n)
