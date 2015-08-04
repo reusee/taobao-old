@@ -472,9 +472,8 @@ func (b *FileBackend) Stats() {
 	}
 
 	n := 0
-	b.iterItems(ColSet2, func(nid int, c1 *Item1, c2 *Item2, c3 *Item3) bool {
+	b.iterItems(0, func(nid int, c1 *Item1, c2 *Item2, c3 *Item3) bool {
 		n++
-		pt("%s\n", c2.Title)
 		return true
 	})
 	pt("%d\n", n)
