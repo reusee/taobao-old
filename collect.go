@@ -37,12 +37,14 @@ func Collect(backend Backend) {
 		}
 	}()
 
-	var c1, c2 uint64
+	var jobsDone, itemsCollected, totalJobsDone uint64
 	go func() {
 		ticker := time.NewTicker(time.Second * 10)
 		t0 := time.Now()
 		for range ticker.C {
-			pt("%d / %d - %v\n", atomic.SwapUint64(&c1, 0), atomic.LoadUint64(&c2), time.Now().Sub(t0))
+			pt("%d / %d / %d - %v\n", atomic.SwapUint64(&jobsDone, 0),
+				atomic.SwapUint64(&itemsCollected, 0),
+				atomic.LoadUint64(&totalJobsDone), time.Now().Sub(t0))
 		}
 	}()
 
@@ -54,8 +56,8 @@ func Collect(backend Backend) {
 			go func() {
 				defer func() {
 					wg.Done()
-					atomic.AddUint64(&c1, 1)
-					atomic.AddUint64(&c2, 1)
+					atomic.AddUint64(&jobsDone, 1)
+					atomic.AddUint64(&totalJobsDone, 1)
 					<-sem
 				}()
 				// check
@@ -108,6 +110,7 @@ func Collect(backend Backend) {
 						Page: job.Page,
 					})
 					ce(err, "save items")
+					atomic.AddUint64(&itemsCollected, uint64(len(items)))
 					// add next pass cat
 					if len(items) > 0 && job.Page < 99 {
 						wg.Add(1)
