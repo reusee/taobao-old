@@ -103,13 +103,7 @@ func (b *FileBackend) scanItemsFile() (err error) {
 			break
 		}
 		ce(err, "read entry header")
-		_, err = b.itemsFile.Seek(int64(header.NidsLen), os.SEEK_CUR)
-		ce(err, "seek")
-		_, err = b.itemsFile.Seek(int64(header.Len1), os.SEEK_CUR)
-		ce(err, "seek")
-		_, err = b.itemsFile.Seek(int64(header.Len2), os.SEEK_CUR)
-		ce(err, "seek")
-		_, err = b.itemsFile.Seek(int64(header.Len3), os.SEEK_CUR)
+		_, err = b.itemsFile.Seek(int64(header.NidsLen+header.Len1+header.Len2+header.Len3), os.SEEK_CUR)
 		ce(err, "seek")
 		job := Job{
 			Cat:  int(header.Cat),
