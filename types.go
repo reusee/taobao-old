@@ -62,28 +62,13 @@ type RawItem struct {
 }
 
 type Item struct {
-	Nid int
-	Item1
-	Item2
-	Item3
-}
-
-// 常用
-type Item1 struct {
-	Category int
-	Price    *big.Rat
-	Sales    int
-	Seller   int
-}
-
-// 长字段
-type Item2 struct {
-	Title    string
-	Location string
-}
-
-// 不常用
-type Item3 struct {
+	Nid               int
+	Category          int
+	Price             *big.Rat
+	Sales             int
+	Seller            int
+	Title             string
+	Location          string
 	Comments          int
 	SellerEncryptedId string
 	SellerName        string

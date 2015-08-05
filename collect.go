@@ -216,25 +216,19 @@ func GetItems(data []byte) (items []Item, err error) {
 		}
 
 		item := Item{
-			Nid: nid,
-			Item1: Item1{
-				Category: cat,
-				Price:    price,
-				Sales:    sales,
-				Seller:   seller,
-			},
-			Item2: Item2{
-				Title:    raw.Title,
-				Location: raw.Item_loc,
-			},
-			Item3: Item3{
-				Comments:          comments,
-				SellerName:        raw.Nick,
-				SellerEncryptedId: raw.Shopcard.EncryptedUserId,
-				SellerLevels:      levels,
-				SellerIsTmall:     raw.Shopcard.IsTmall,
-				SellerCredit:      raw.Shopcard.SellerCredit,
-			},
+			Nid:               nid,
+			Category:          cat,
+			Price:             price,
+			Sales:             sales,
+			Seller:            seller,
+			Title:             raw.Title,
+			Location:          raw.Item_loc,
+			Comments:          comments,
+			SellerName:        raw.Nick,
+			SellerEncryptedId: raw.Shopcard.EncryptedUserId,
+			SellerLevels:      levels,
+			SellerIsTmall:     raw.Shopcard.IsTmall,
+			SellerCredit:      raw.Shopcard.SellerCredit,
 		}
 		items = append(items, item)
 	}
