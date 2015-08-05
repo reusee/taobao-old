@@ -61,6 +61,9 @@ func Collect(backend Backend) {
 					<-sem
 				}()
 				// check
+				if job.Page > 99 {
+					return
+				}
 				if backend.IsCollected(job) {
 					wg.Add(1)
 					jobsIn <- Job{
