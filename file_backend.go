@@ -294,13 +294,16 @@ func (b *FileBackend) Stats() {
 		}
 	}
 
-	n := 0
+	nitems := 0
+	njobs := 0
+	t0 := time.Now()
 	b.itemsFile.Iter([]string{"Nid"}, func(cols ...interface{}) bool {
 		nids := cols[0].([]int)
-		n += len(nids)
+		nitems += len(nids)
+		njobs++
 		return true
 	})
-	pt("%d\n", n)
+	pt("%v - %d items, %d jobs\n", time.Now().Sub(t0), nitems, njobs)
 
 }
 
