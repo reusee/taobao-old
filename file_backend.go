@@ -227,12 +227,16 @@ func (b *FileBackend) PostProcess() {
 
 	// cat stats
 	catStats := make(map[int]*CatStat)
-	b.itemsFile.IterRows([]string{"Category", "Sales"}, func(cat int, sales int) bool {
-		if _, ok := catStats[cat]; !ok {
-			catStats[cat] = new(CatStat)
+	b.itemsFile.Iter([]string{"Category", "Sales"}, func(cols ...interface{}) bool {
+		cats := cols[0].([]int)
+		sales := cols[1].([]int)
+		for n, cat := range cats {
+			if _, ok := catStats[cat]; !ok {
+				catStats[cat] = new(CatStat)
+			}
+			catStats[cat].Items += 1
+			catStats[cat].Sales += sales[n]
 		}
-		catStats[cat].Items += 1
-		catStats[cat].Sales += sales
 		return true
 	})
 	catStatsFile, err := os.Create(filepath.Join(b.dataDir, sp("%s-cat-stats", b.date)))
@@ -274,22 +278,26 @@ func (b *FileBackend) Stats() {
 	if false {
 		for _, cat := range unknownCats {
 			n := 0
-			b.itemsFile.IterRows([]string{"Category", "Title"}, func(category int, title string) bool {
-				if category != cat {
-					return true
+			b.itemsFile.Iter([]string{"Category", "Title"}, func(cols ...interface{}) bool {
+				cats := cols[0].([]int)
+				titles := cols[1].([]string)
+				for i, category := range cats {
+					if category != cat {
+						continue
+					}
+					pt("%s\n", titles[i])
+					n++
 				}
-				pt("%s\n", title)
-				n++
 				return n < 30
-				return true
 			})
 			pt("\n")
 		}
 	}
 
 	n := 0
-	b.itemsFile.IterRows([]string{"Nid"}, func(nid int) bool {
-		n++
+	b.itemsFile.Iter([]string{"Nid"}, func(cols ...interface{}) bool {
+		nids := cols[0].([]int)
+		n += len(nids)
 		return true
 	})
 	pt("%d\n", n)
