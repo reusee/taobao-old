@@ -195,8 +195,11 @@ func GetItems(data []byte) (items []Item, err error) {
 		salesStr := raw.View_sales
 		salesStr = strings.Replace(salesStr, "人收货", "", -1)
 		salesStr = strings.Replace(salesStr, "人付款", "", -1)
-		sales, err := strconv.Atoi(salesStr)
-		ce(err, "get sales")
+		var sales int
+		if len(salesStr) > 0 {
+			sales, err = strconv.Atoi(salesStr)
+			ce(err, "get sales")
+		}
 
 		comments := 0
 		if len(raw.Comment_count) > 0 {
